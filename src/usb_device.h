@@ -1,5 +1,5 @@
 /*
- * firmware.h - FX3 firmware functions
+ * usb_device.h - FX3 functions
  *
  * Copyright (C) 2020 by Franco Venturi
  *
@@ -19,8 +19,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#ifndef __FIRMWARE_H
-#define __FIRMWARE_H
+#ifndef __USB_DEVICE_H
+#define __USB_DEVICE_H
 
 #include <libusb.h>
 
@@ -29,10 +29,28 @@
 extern "C" {
 #endif
 
-int load_image(struct libusb_device_handle *dev_handle, const char *imagefile);
+typedef struct usb_device {
+  struct libusb_device_handle *dev_handle;
+} usb_device_t;
+
+struct usb_device_info {
+  unsigned char *manufacturer;
+  unsigned char *product;
+  unsigned char *serial_number;
+};
+
+int usb_device_count_devices();
+
+int usb_device_get_device_list(struct usb_device_info **usb_device_infos);
+
+int usb_device_free_device_list(struct usb_device_info *usb_device_infos);
+
+usb_device_t *usb_device_open(int index, const char* imagefile);
+
+void usb_device_close(usb_device_t *this);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __FIRMWARE_H */
+#endif /* __USB_DEVICE_H */

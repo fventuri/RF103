@@ -27,8 +27,10 @@
 extern "C" {
 #endif
 
+typedef struct usb_device usb_device_t;
+
 typedef struct rf103 {
-  struct libusb_device_handle *dev_handle;
+  usb_device_t *usb_device;
 } rf103_t;
 
 struct rf103_device_info {

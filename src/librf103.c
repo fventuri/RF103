@@ -27,156 +27,41 @@
 
 #include "rf103.h"
 #include "error_handling.h"
-#include "firmware.h"
-
-
-struct rf103_usb_id {
-  uint16_t vid;
-  uint16_t pid;
-  int needs_firmware;
-};
-
-static struct rf103_usb_id rf103_usb_ids[] = {
-  { 0x04b4, 0x00f3, 1 },     /* Cypress / FX3 Boot-loader */
-  { 0x04b4, 0x00f1, 0 }      /* Cypress / FX3 Streamer Example */
-};
-static int n_rf103_usb_ids = sizeof(rf103_usb_ids) / sizeof(rf103_usb_ids[0]);
+#include "usb_device.h"
 
 
 int rf103_get_device_count()
 {
-  int ret_val = -1;
-
-  int ret = libusb_init(0);
-  if (ret < 0) {
-    usb_error(ret, __func__, __FILE__, __LINE__);
-    goto FAIL0;
-  }
-  libusb_device **list = 0;
-  ssize_t nusbdevices = libusb_get_device_list(0, &list);
-  if (nusbdevices < 0) {
-    usb_error(nusbdevices, __func__, __FILE__, __LINE__);
-    goto FAIL1;
-  }
-  int count = 0;
-  for (ssize_t i = 0; i < nusbdevices; ++i) {
-    libusb_device *dev = list[i];
-    struct libusb_device_descriptor desc;
-    ret = libusb_get_device_descriptor(dev, &desc);
-    for (int i = 0; i < n_rf103_usb_ids; ++i) {
-      if (desc.idVendor == rf103_usb_ids[i].vid &&
-          desc.idProduct == rf103_usb_ids[i].pid) {
-        count++;
-      }
-    }
-  }
-  libusb_free_device_list(list, 1);
-
-  ret_val = count;
-
-FAIL1:
-  libusb_exit(0);
-FAIL0:
-  return ret_val;
+  return usb_device_count_devices();
 }
 
 
 int rf103_get_device_info(struct rf103_device_info **rf103_device_infos)
 {
-  const int MAX_STRING_BYTES = 256;
+  int ret_val = -1; 
 
-  int ret_val = -1;
-
-  if (rf103_device_infos == 0) {
-    error("argument rf103_device_infos is a null pointer", __func__, __FILE__, __LINE__);
-    goto FAIL0;
-  }
-
-  int ret = libusb_init(0);
+  /* no more info to add from usb_device_get_device_list() for now */
+  struct usb_device_info *list;
+  int ret = usb_device_get_device_list(&list);
   if (ret < 0) {
-    usb_error(ret, __func__, __FILE__, __LINE__);
     goto FAIL0;
   }
-  libusb_device **list = 0;
-  ssize_t nusbdevices = libusb_get_device_list(0, &list);
-  if (nusbdevices < 0) {
-    usb_error(nusbdevices, __func__, __FILE__, __LINE__);
-    goto FAIL1;
+
+  int count = ret;
+  struct rf103_device_info *device_infos = (struct rf103_device_info *) malloc((count + 1) * sizeof(struct rf103_device_info));
+  /* use the first element to save the pointer to the underlying list,
+     so we can use it to free it later on */
+  *((void **) device_infos) = list;
+  device_infos++;
+  for (int i = 0; i < count; ++i) {
+    device_infos[i].manufacturer = list[i].manufacturer;
+    device_infos[i].product = list[i].product;
+    device_infos[i].serial_number = list[i].serial_number;
   }
-
-  struct rf103_device_info *device_infos = (struct rf103_device_info *) malloc((nusbdevices + 1) * sizeof(struct rf103_device_info));
-  int count = 0;
-  for (ssize_t i = 0; i < nusbdevices; ++i) {
-    libusb_device *device = list[i];
-    struct libusb_device_descriptor desc;
-    ret = libusb_get_device_descriptor(device, &desc);
-    for (int i = 0; i < n_rf103_usb_ids; ++i) {
-      if (!(desc.idVendor == rf103_usb_ids[i].vid &&
-            desc.idProduct == rf103_usb_ids[i].pid)) {
-        continue;
-      }
-
-      libusb_device_handle *dev_handle = 0;
-      ret = libusb_open(device, &dev_handle);
-      if (ret < 0) {
-        usb_error(ret, __func__, __FILE__, __LINE__);
-        goto FAIL2;
-      }
-
-      device_infos[count].manufacturer = (unsigned char *) malloc(MAX_STRING_BYTES);
-      device_infos[count].manufacturer[0] = '\0';
-      if (desc.iManufacturer) {
-        ret = libusb_get_string_descriptor_ascii(dev_handle, desc.iManufacturer,
-                      device_infos[count].manufacturer, MAX_STRING_BYTES);
-        if (ret < 0) {
-          usb_error(ret, __func__, __FILE__, __LINE__);
-          goto FAIL3;
-        }
-      }
-
-      device_infos[count].product = (unsigned char *) malloc(MAX_STRING_BYTES);
-      device_infos[count].product[0] = '\0';
-      if (desc.iProduct) {
-        ret = libusb_get_string_descriptor_ascii(dev_handle, desc.iProduct,
-                      device_infos[count].product, MAX_STRING_BYTES);
-        if (ret < 0) {
-          usb_error(ret, __func__, __FILE__, __LINE__);
-          goto FAIL3;
-        }
-      }
-
-      device_infos[count].serial_number = (unsigned char *) malloc(MAX_STRING_BYTES);
-      device_infos[count].serial_number[0] = '\0';
-      if (desc.iSerialNumber) {
-        ret = libusb_get_string_descriptor_ascii(dev_handle, desc.iSerialNumber,
-                      device_infos[count].serial_number, MAX_STRING_BYTES);
-        if (ret < 0) {
-          usb_error(ret, __func__, __FILE__, __LINE__);
-          goto FAIL3;
-        }
-      }
-
-      ret = 0;
-FAIL3:
-      libusb_close(dev_handle);
-      if (ret < 0) {
-        goto FAIL2;
-      }
-      count++;
-    }
-  }
-
-  device_infos[count].manufacturer = 0;
-  device_infos[count].product = 0;
-  device_infos[count].serial_number = 0;
 
   *rf103_device_infos = device_infos;
   ret_val = count;
 
-FAIL2:
-  libusb_free_device_list(list, 1);
-FAIL1:
-  libusb_exit(0);
 FAIL0:
   return ret_val;
 }
@@ -184,153 +69,40 @@ FAIL0:
 
 int rf103_free_device_info(struct rf103_device_info *rf103_device_infos)
 {
-  for (struct rf103_device_info *rdi = rf103_device_infos;
-       rdi->manufacturer || rdi->product || rdi->serial_number;
-       ++rdi) {
-    if (rdi->manufacturer) {
-      free(rdi->manufacturer);
-    }
-    if (rdi->product) {
-      free(rdi->product);
-    }
-    if (rdi->serial_number) {
-      free(rdi->serial_number);
-    }
-  }
+  /* just free our structure and call usb_device_free_device_list() to free
+     underlying data structure */
+  /* retrieve the underlying usb_device list pointer first */
+  rf103_device_infos--;
+  struct usb_device_info *list = (struct usb_device_info *) *((void **) rf103_device_infos);
   free(rf103_device_infos);
-  return 0;
+  int ret = usb_device_free_device_list(list);
+  return ret;
 }
 
-
-static struct libusb_device_handle *find_rf103(int index, int *needs_firmware);
 
 rf103_t *rf103_open(int index, const char* imagefile)
 {
   rf103_t *ret_val = 0;
 
-  int ret = libusb_init(0);
-  if (ret < 0) {
-    usb_error(ret, __func__, __FILE__, __LINE__);
+  usb_device_t *usb_device = usb_device_open(index, imagefile);
+  if (usb_device == 0) {
+    fprintf(stderr, "ERROR - usb_device_open() failed\n");
     goto FAIL0;
-  }
-
-  int needs_firmware = 0;
-  struct libusb_device_handle *dev_handle = find_rf103(index, &needs_firmware);
-  if (dev_handle == 0) {
-    goto FAIL1;
-  }
-
-  if (needs_firmware) {
-    ret = load_image(dev_handle, imagefile);
-    if (ret < 0) {
-      error("load_image() failed", __func__, __FILE__, __LINE__);
-      goto FAIL2;
-    }
-
-    /* rescan USB to get a new device handle */
-    libusb_close(dev_handle);
-    needs_firmware = 0;
-    dev_handle = find_rf103(index, &needs_firmware);
-    if (dev_handle == 0) {
-      goto FAIL1;
-    }
-    if (needs_firmware) {
-      error("device is still in boot loader mode", __func__, __FILE__, __LINE__);
-      goto FAIL2;
-    }
   }
 
   rf103_t *this = (rf103_t *) malloc(sizeof(rf103_t));
-  this->dev_handle = dev_handle;
+  this->usb_device = usb_device;
 
   ret_val = this;
 
-FAIL2:
-  libusb_close(dev_handle);
-FAIL1:
-  libusb_exit(0);
 FAIL0:
-  return ret_val;
-}
-
-
-static struct libusb_device_handle *find_rf103(int index, int *needs_firmware)
-{
-  struct libusb_device_handle *ret_val = 0;
-
-  *needs_firmware = 0;
-
-  libusb_device **list = 0;
-  ssize_t nusbdevices = libusb_get_device_list(0, &list);
-  if (nusbdevices < 0) {
-    usb_error(nusbdevices, __func__, __FILE__, __LINE__);
-    goto FAIL0;
-  }
-
-  int count = 0;
-  libusb_device *device = 0;
-  for (ssize_t i = 0; i < nusbdevices; ++i) {
-    libusb_device *dev = list[i];
-    struct libusb_device_descriptor desc;
-    libusb_get_device_descriptor(dev, &desc);
-    for (int i = 0; i < n_rf103_usb_ids; ++i) {
-      if (desc.idVendor == rf103_usb_ids[i].vid &&
-          desc.idProduct == rf103_usb_ids[i].pid) {
-        if (count == index) {
-          device = dev;
-          *needs_firmware = rf103_usb_ids[i].needs_firmware;
-        }
-        count++;
-      }
-    }
-  }
-
-  if (device == 0) {
-    fprintf(stderr, "ERROR - rf103@%d not found\n", index);
-    goto FAIL1;
-  }
-
-  libusb_device_handle *dev_handle = 0;
-  int ret = libusb_open(device, &dev_handle);
-  if (ret < 0) {
-    usb_error(ret, __func__, __FILE__, __LINE__);
-    goto FAIL1;
-  }
-  libusb_free_device_list(list, 1);
-
-  ret = libusb_kernel_driver_active(dev_handle, 0);
-  if (ret < 0) {
-    usb_error(ret, __func__, __FILE__, __LINE__);
-    goto FAILA;
-  }
-  if (ret == 1) {
-    fprintf(stderr, "ERROR - device busy\n");
-    goto FAILA;
-  }
-
-  ret = libusb_claim_interface(dev_handle, 0);
-  if (ret < 0) {
-    usb_error(ret, __func__, __FILE__, __LINE__);
-    goto FAILA;
-  }
-
-  ret_val = dev_handle;
-
-FAIL1:
-  libusb_free_device_list(list, 1);
-FAIL0:
-  return ret_val;
-
-FAILA:
-  libusb_close(dev_handle);
   return ret_val;
 }
 
 
 void rf103_close(rf103_t *this)
 {
-  libusb_close(this->dev_handle);
+  usb_device_close(this->usb_device);
   free(this);
-  libusb_exit(0);
   return;
 }

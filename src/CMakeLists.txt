@@ -7,7 +7,7 @@
 add_library(rf103 SHARED
     librf103.c
     error_handling.c
-    firmware.c
+    usb_device.c
 )
 set_target_properties(rf103 PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(rf103 PROPERTIES SOVERSION 0)
