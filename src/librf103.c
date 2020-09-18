@@ -23,10 +23,9 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <libusb.h>
 
 #include "rf103.h"
-#include "error_handling.h"
+#include "logging.h"
 #include "usb_device.h"
 
 

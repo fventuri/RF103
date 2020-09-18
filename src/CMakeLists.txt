@@ -6,7 +6,7 @@
 ### shared library
 add_library(rf103 SHARED
     librf103.c
-    error_handling.c
+    logging.c
     usb_device.c
 )
 set_target_properties(rf103 PROPERTIES VERSION ${PROJECT_VERSION})

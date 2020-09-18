@@ -1,5 +1,5 @@
 /*
- * error_handling.h - error handling functions
+ * logging.h - logging functions
  *
  * Copyright (C) 2020 by Franco Venturi
  *
@@ -19,8 +19,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#ifndef __ERROR_HANDLING_H
-#define __ERROR_HANDLING_H
+#ifndef __LOGGING_H
+#define __LOGGING_H
 
 #include <libusb.h>
 
@@ -29,15 +29,15 @@
 extern "C" {
 #endif
 
-void error(const char *error_message, const char *function, const char *file,
-           int line);
-void usb_error(int usb_error_code, const char *function, const char *file,
-               int line);
-void usb_warning(int usb_error_code, const char *function, const char *file,
-                 int line);
+void log_error(const char *error_message, const char *function,
+               const char *file, int line);
+void log_usb_error(int usb_error_code, const char *function, const char *file,
+                   int line);
+void log_usb_warning(int usb_error_code, const char *function, const char *file,
+                     int line);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __ERROR_HANDLING_H */
+#endif /* __LOGGING_H */

@@ -30,7 +30,12 @@ extern "C" {
 #endif
 
 typedef struct usb_device {
-  struct libusb_device_handle *dev_handle;
+  libusb_device *dev;
+  libusb_device_handle *dev_handle;
+  int nendpoints;
+#define MAX_ENDPOINTS (16)
+  uint8_t endpoints[MAX_ENDPOINTS][2];
+  uint8_t bulk_in_endpoint;
 } usb_device_t;
 
 struct usb_device_info {

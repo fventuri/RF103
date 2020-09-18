@@ -1,5 +1,5 @@
 /*
- * error_handling.c - error handling functions
+ * logging.c - logging functions
  *
  * Copyright (C) 2020 by Franco Venturi
  *
@@ -22,25 +22,25 @@
 #include <stdio.h>
 #include <libusb.h>
 
-#include "error_handling.h"
+#include "logging.h"
 
 
-void error(const char *error_message, const char *function, const char *file,
-               int line) {
-  fprintf(stderr, "ERROR - %s in %s at %s:%d\n",
-          error_message, function, file, line);
+void log_error(const char *error_message, const char *function,
+               const char *file, int line) {
+  fprintf(stderr, "ERROR - %s in %s at %s:%d\n", error_message, function,
+          file, line);
   return;
 }
 
-void usb_error(int usb_error_code, const char *function, const char *file,
-               int line) {
+void log_usb_error(int usb_error_code, const char *function, const char *file,
+                   int line) {
   fprintf(stderr, "ERROR - USB error %s in %s at %s:%d\n",
           libusb_error_name(usb_error_code), function, file, line);
   return;
 }
 
-void usb_warning(int usb_error_code, const char *function, const char *file,
-                 int line) {
+void log_usb_warning(int usb_error_code, const char *function, const char *file,
+                     int line) {
   fprintf(stderr, "WARNING - USB warning %s in %s at %s:%d\n",
           libusb_error_name(usb_error_code), function, file, line);
   return;
