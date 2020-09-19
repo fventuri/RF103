@@ -20,8 +20,12 @@
  */
 
 #include <stdio.h>
+#include <unistd.h>
 
 #include "rf103.h"
+
+
+static void blink_led(rf103_t *rf103, uint8_t color);
 
 
 int main(int argc, char **argv)
@@ -60,7 +64,36 @@ int main(int argc, char **argv)
     fprintf(stderr, "ERROR - rf103_open() failed\n");
     return -1;
   }
+
+  /* blink the LEDs */
+  printf("blinking the red LED\n");
+  blink_led(rf103, LED_RED);
+  printf("blinking the yellow LED\n");
+  blink_led(rf103, LED_YELLOW);
+  printf("blinking the blue LED\n");
+  blink_led(rf103, LED_BLUE);
+
+  /* done */
   rf103_close(rf103);
 
   return 0;
+}
+
+static void blink_led(rf103_t *rf103, uint8_t color)
+{
+  for (int i = 0; i < 5; ++i) {
+    int ret = rf103_led_on(rf103, color);
+    if (ret < 0) {
+      fprintf(stderr, "ERROR - rf103_led_on(%02x) failed\n", color);
+      return;
+    }
+    sleep(1);
+    ret = rf103_led_off(rf103, color);
+    if (ret < 0) {
+      fprintf(stderr, "ERROR - rf103_led_off(%02x) failed\n", color);
+      return;
+    }
+    sleep(1);
+  }
+  return;
 }

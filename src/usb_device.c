@@ -39,6 +39,8 @@
 #include "logging.h"
 
 
+typedef struct usb_device usb_device_t;
+
 /* internal functions */
 static libusb_device_handle *find_usb_device(int index,
                              libusb_device **device, int *needs_firmware);
@@ -50,17 +52,30 @@ static int transfer_image(const uint8_t *image,
 static int list_endpoints(uint8_t endpoints[][2], libusb_device *device);
 
 
+typedef struct usb_device {
+  libusb_device *dev;
+  libusb_device_handle *dev_handle;
+  int nendpoints;
+#define MAX_ENDPOINTS (16)
+  uint8_t endpoints[MAX_ENDPOINTS][2];
+  uint8_t bulk_in_endpoint;
+  uint8_t gpio_register;
+} usb_device_t;
+
 struct usb_device_id {
   uint16_t vid;
   uint16_t pid;
   int needs_firmware;
 };
 
+
 static struct usb_device_id usb_device_ids[] = {
   { 0x04b4, 0x00f3, 1 },     /* Cypress / FX3 Boot-loader */
   { 0x04b4, 0x00f1, 0 }      /* Cypress / FX3 Streamer Example */
 };
 static int n_usb_device_ids = sizeof(usb_device_ids) / sizeof(usb_device_ids[0]);
+
+static const uint8_t SI5351_ADDR = 0x60 << 1;
 
 
 int usb_device_count_devices()
@@ -270,7 +285,20 @@ usb_device_t *usb_device_open(int index, const char* imagefile)
     goto FAIL2;
   }
   int nendpoints = ret;
+  uint8_t bulk_in_endpoint = 0;
+  for (int i = 0; i < nendpoints; ++i) {
+    if ((endpoints[i][1] & 0x03) == LIBUSB_TRANSFER_TYPE_BULK &&
+        (endpoints[i][0] & 0x80) == LIBUSB_ENDPOINT_IN) {
+      bulk_in_endpoint = endpoints[i][0];
+      break;
+    }
+  }
+  if (bulk_in_endpoint == 0) {
+    fprintf(stderr, "ERROR - bulk in endpoint not found\n");
+    goto FAIL2;
+  }
 
+  /* we are good here - create and initialize the usb_device */
   usb_device_t *this = (usb_device_t *) malloc(sizeof(usb_device_t));
   this->dev = device;
   this->dev_handle = dev_handle;
@@ -280,14 +308,8 @@ usb_device_t *usb_device_open(int index, const char* imagefile)
     this->endpoints[i][0] = endpoints[i][0];
     this->endpoints[i][1] = endpoints[i][1];
   }
-  this->bulk_in_endpoint = 0;
-  for (int i = 0; i < nendpoints; ++i) {
-    if ((this->endpoints[i][1] & 0x03) == LIBUSB_TRANSFER_TYPE_BULK &&
-        (this->endpoints[i][0] & 0x80) == LIBUSB_ENDPOINT_IN) {
-      this->bulk_in_endpoint = this->endpoints[i][0];
-      break;
-    }
-  }
+  this->bulk_in_endpoint = bulk_in_endpoint;
+  this->gpio_register = 0x17;
 
   ret_val = this;
   return ret_val;
@@ -307,6 +329,79 @@ void usb_device_close(usb_device_t *this)
   free(this);
   libusb_exit(0);
   return;
+}
+
+
+int usb_device_control(usb_device_t *this, uint8_t request, uint16_t value,
+                       uint16_t index, uint8_t *data, uint16_t length) {
+
+  const uint8_t bmWriteRequestType = LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE;
+  const uint8_t bmReadRequestType = LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE;
+  const unsigned int timeout = 5000;        // timeout (in ms) for each command
+
+  uint8_t dummy[] = { 0 };
+
+  int ret;
+  switch (request) {
+    case RESETFX3:
+    case STARTFX3:
+    case STOPFX3:
+    case PAUSEFX3:
+      ret = libusb_control_transfer(this->dev_handle, bmWriteRequestType,
+                                    request, 0, 0, dummy, sizeof(dummy),
+                                    timeout);
+      if (ret < 0) {
+        log_usb_error(ret, __func__, __FILE__, __LINE__);
+        return -1;
+      }
+      break;
+    case GPIOFX3:
+    case I2CWFX3:
+      ret = libusb_control_transfer(this->dev_handle, bmWriteRequestType,
+                                    request, value, index, data, length,
+                                    timeout);
+      if (ret < 0) {
+        log_usb_error(ret, __func__, __FILE__, __LINE__);
+        return -1;
+      }
+      break;
+    case TESTFX3:
+    case I2CRFX3:
+      ret = libusb_control_transfer(this->dev_handle, bmReadRequestType,
+                                    request, value, index, data, length,
+                                    timeout);
+      if (ret < 0) {
+        log_usb_error(ret, __func__, __FILE__, __LINE__);
+        return -1;
+      }
+      break;
+    default:
+      fprintf(stderr, "ERROR - unknown USB device control request: 0x%02x\n",
+              request);
+      return -1;
+  }
+  return 0;
+}
+
+
+int usb_device_gpio_on(usb_device_t *this, uint8_t bits) {
+  this->gpio_register |= bits;
+  return usb_device_control(this, GPIOFX3, SI5351_ADDR, 0, &this->gpio_register,
+                            sizeof(this->gpio_register));
+}
+
+
+int usb_device_gpio_off(usb_device_t *this, uint8_t bits) {
+  this->gpio_register &= ~bits;
+  return usb_device_control(this, GPIOFX3, SI5351_ADDR, 0, &this->gpio_register,
+                            sizeof(this->gpio_register));
+}
+
+
+int usb_device_gpio_toggle(usb_device_t *this, uint8_t bits) {
+  this->gpio_register ^= bits;
+  return usb_device_control(this, GPIOFX3, SI5351_ADDR, 0, &this->gpio_register,
+                            sizeof(this->gpio_register));
 }
 
 

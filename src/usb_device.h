@@ -29,19 +29,23 @@
 extern "C" {
 #endif
 
-typedef struct usb_device {
-  libusb_device *dev;
-  libusb_device_handle *dev_handle;
-  int nendpoints;
-#define MAX_ENDPOINTS (16)
-  uint8_t endpoints[MAX_ENDPOINTS][2];
-  uint8_t bulk_in_endpoint;
-} usb_device_t;
+typedef struct usb_device usb_device_t;
 
 struct usb_device_info {
   unsigned char *manufacturer;
   unsigned char *product;
   unsigned char *serial_number;
+};
+
+enum {
+  STARTFX3 = 0xaa,
+  STOPFX3 = 0xab,
+  TESTFX3 = 0xac,
+  RESETFX3 = 0xcc,
+  PAUSEFX3 = 0xdd,
+  GPIOFX3 = 0xbc,
+  I2CWFX3 = 0xba,
+  I2CRFX3 = 0xbe
 };
 
 int usb_device_count_devices();
@@ -53,6 +57,15 @@ int usb_device_free_device_list(struct usb_device_info *usb_device_infos);
 usb_device_t *usb_device_open(int index, const char* imagefile);
 
 void usb_device_close(usb_device_t *this);
+
+int usb_device_control(usb_device_t *this, uint8_t request, uint16_t value,
+                       uint16_t index, uint8_t *data, uint16_t length);
+
+int usb_device_gpio_on(usb_device_t *this, uint8_t bits);
+
+int usb_device_gpio_off(usb_device_t *this, uint8_t bits);
+
+int usb_device_gpio_toggle(usb_device_t *this, uint8_t bits);
 
 #ifdef __cplusplus
 }

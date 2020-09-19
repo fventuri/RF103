@@ -105,3 +105,45 @@ void rf103_close(rf103_t *this)
   free(this);
   return;
 }
+
+
+int rf103_led_on(rf103_t *this, uint8_t color)
+{
+  switch (color) {
+    case LED_RED:
+    case LED_YELLOW:
+    case LED_BLUE:
+      return usb_device_gpio_on(this->usb_device, color);
+    default:
+      fprintf(stderr, "ERROR - invalid LED color: 0x%02x\n", color);
+      return -1;
+  }
+}
+
+
+int rf103_led_off(rf103_t *this, uint8_t color)
+{
+  switch (color) {
+    case LED_RED:
+    case LED_YELLOW:
+    case LED_BLUE:
+      return usb_device_gpio_off(this->usb_device, color);
+    default:
+      fprintf(stderr, "ERROR - invalid LED color: 0x%02x\n", color);
+      return -1;
+  }
+}
+
+
+int rf103_led_toggle(rf103_t *this, uint8_t color)
+{
+  switch (color) {
+    case LED_RED:
+    case LED_YELLOW:
+    case LED_BLUE:
+      return usb_device_gpio_toggle(this->usb_device, color);
+    default:
+      fprintf(stderr, "ERROR - invalid LED color: 0x%02x\n", color);
+      return -1;
+  }
+}

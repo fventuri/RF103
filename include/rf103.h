@@ -27,6 +27,8 @@
 extern "C" {
 #endif
 
+#include <stdint.h>
+
 typedef struct usb_device usb_device_t;
 
 typedef struct rf103 {
@@ -39,6 +41,12 @@ struct rf103_device_info {
   unsigned char *serial_number;
 };
 
+enum {
+  LED_RED    = 0x01,    /* GPIO21 */
+  LED_YELLOW = 0x02,    /* GPIO22 ??? */
+  LED_BLUE   = 0x04     /* GPIO22 ??? */
+};
+
 
 int rf103_get_device_count();
 
@@ -49,6 +57,12 @@ int rf103_free_device_info(struct rf103_device_info *rf103_device_infos);
 rf103_t *rf103_open(int index, const char* imagefile);
 
 void rf103_close(rf103_t *this);
+
+int rf103_led_on(rf103_t *this, uint8_t color);
+
+int rf103_led_off(rf103_t *this, uint8_t color);
+
+int rf103_led_toggle(rf103_t *this, uint8_t color);
 
 #ifdef __cplusplus
 }
