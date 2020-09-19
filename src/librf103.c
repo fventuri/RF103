@@ -27,6 +27,18 @@
 #include "rf103.h"
 #include "logging.h"
 #include "usb_device.h"
+#include "clock_source.h"
+
+typedef struct rf103 rf103_t;
+
+/* internal functions */
+static uint8_t initial_gpio_register();
+
+
+typedef struct rf103 {
+  usb_device_t *usb_device;
+  clock_source_t *clock_source;
+} rf103_t;
 
 
 /***************************
@@ -87,17 +99,28 @@ rf103_t *rf103_open(int index, const char* imagefile)
 {
   rf103_t *ret_val = 0;
 
-  usb_device_t *usb_device = usb_device_open(index, imagefile);
+  usb_device_t *usb_device = usb_device_open(index, imagefile,
+                                             initial_gpio_register());
   if (usb_device == 0) {
     fprintf(stderr, "ERROR - usb_device_open() failed\n");
     goto FAIL0;
   }
 
+  clock_source_t *clock_source = clock_source_open();
+  if (clock_source == 0) {
+    fprintf(stderr, "ERROR - clock_source_open() failed\n");
+    goto FAIL1;
+  }
+
   rf103_t *this = (rf103_t *) malloc(sizeof(rf103_t));
   this->usb_device = usb_device;
+  this->clock_source = clock_source;
 
   ret_val = this;
+  return ret_val;
 
+FAIL1:
+  usb_device_close(usb_device);
 FAIL0:
   return ret_val;
 }
@@ -105,6 +128,7 @@ FAIL0:
 
 void rf103_close(rf103_t *this)
 {
+  clock_source_close(this->clock_source);
   usb_device_close(this->usb_device);
   free(this);
   return;
@@ -125,6 +149,13 @@ enum {
   GPIO_DITHER     = 0x40,    /* GPIO29 */
   GPIO_RANDOM     = 0x80     /* GPIO20 */
 };
+
+
+static uint8_t initial_gpio_register()
+{
+  return GPIO_SEL1 | GPIO_LED_BLUE | GPIO_LED_YELLOW | GPIO_LED_RED;
+}
+
 
 int rf103_led_on(rf103_t *this, uint8_t led_pattern)
 {

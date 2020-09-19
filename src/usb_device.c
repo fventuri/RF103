@@ -240,7 +240,8 @@ int usb_device_free_device_list(struct usb_device_info *usb_device_infos)
 }
 
 
-usb_device_t *usb_device_open(int index, const char* imagefile)
+usb_device_t *usb_device_open(int index, const char* imagefile,
+                              uint8_t gpio_register)
 {
   usb_device_t *ret_val = 0;
 
@@ -309,7 +310,7 @@ usb_device_t *usb_device_open(int index, const char* imagefile)
     this->endpoints[i][1] = endpoints[i][1];
   }
   this->bulk_in_endpoint = bulk_in_endpoint;
-  this->gpio_register = 0x17;
+  this->gpio_register = gpio_register;
 
   ret_val = this;
   return ret_val;

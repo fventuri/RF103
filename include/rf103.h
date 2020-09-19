@@ -29,11 +29,7 @@ extern "C" {
 
 #include <stdint.h>
 
-typedef struct usb_device usb_device_t;
-
-typedef struct rf103 {
-  usb_device_t *usb_device;
-} rf103_t;
+typedef struct rf103 rf103_t;
 
 struct rf103_device_info {
   unsigned char *manufacturer;
