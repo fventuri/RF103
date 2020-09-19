@@ -2,7 +2,17 @@
 
 A library and a few simple applications for wideband SDR receivers like BBRF103, RX-666, RX888, HF103, etc
 
-Similar in concept to librtlsdr (see <https://osmocom.org/projects/rtl-sdr/wiki> and <https://github.com/librtlsdr/librtlsdr>).
+These SDR receivers and this library wouldn't be possible without all the excellent work by Oscar Steila, IK1XPV - a great deal of useful information about them is at <http://www.steila.com/blog/> and at <https://sdr-prototypes.blogspot.com/>.
+
+This library is similar in concept to librtlsdr (see <https://osmocom.org/projects/rtl-sdr/wiki> and <https://github.com/librtlsdr/librtlsdr>).
+
+I wrote this library and the example applications from scratch (i.e. any bug in this code is exclusively my fault). Many parts of the code use Oscar's ExtIO dll driver for Windows (<https://github.com/ik1xpv/ExtIO_sddc-Ver0.96>) as a reference, and I want to really thank him for this wonderful project!
+
+
+## Credits
+
+- Oscar Steila, IK1XPV for the BBRF103 and HR103 projects
+
 
 ## How to build
 

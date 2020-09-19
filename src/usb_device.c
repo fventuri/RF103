@@ -384,22 +384,22 @@ int usb_device_control(usb_device_t *this, uint8_t request, uint16_t value,
 }
 
 
-int usb_device_gpio_on(usb_device_t *this, uint8_t bits) {
-  this->gpio_register |= bits;
+int usb_device_gpio_on(usb_device_t *this, uint8_t bit_pattern) {
+  this->gpio_register |= bit_pattern;
   return usb_device_control(this, GPIOFX3, SI5351_ADDR, 0, &this->gpio_register,
                             sizeof(this->gpio_register));
 }
 
 
-int usb_device_gpio_off(usb_device_t *this, uint8_t bits) {
-  this->gpio_register &= ~bits;
+int usb_device_gpio_off(usb_device_t *this, uint8_t bit_pattern) {
+  this->gpio_register &= ~bit_pattern;
   return usb_device_control(this, GPIOFX3, SI5351_ADDR, 0, &this->gpio_register,
                             sizeof(this->gpio_register));
 }
 
 
-int usb_device_gpio_toggle(usb_device_t *this, uint8_t bits) {
-  this->gpio_register ^= bits;
+int usb_device_gpio_toggle(usb_device_t *this, uint8_t bit_pattern) {
+  this->gpio_register ^= bit_pattern;
   return usb_device_control(this, GPIOFX3, SI5351_ADDR, 0, &this->gpio_register,
                             sizeof(this->gpio_register));
 }

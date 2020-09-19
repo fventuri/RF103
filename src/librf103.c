@@ -29,6 +29,10 @@
 #include "usb_device.h"
 
 
+/***************************
+ * basic functions
+ ***************************/
+
 int rf103_get_device_count()
 {
   return usb_device_count_devices();
@@ -107,43 +111,66 @@ void rf103_close(rf103_t *this)
 }
 
 
-int rf103_led_on(rf103_t *this, uint8_t color)
+/***************************
+ * GPIO related functions
+ ***************************/
+
+enum {
+  GPIO_LED_RED    = 0x01,    /* GPIO21 */
+  GPIO_LED_YELLOW = 0x02,    /* GPIO22 */
+  GPIO_LED_BLUE   = 0x04,    /* GPIO23 */
+  GPIO_SEL0       = 0x08,    /* GPIO26 */
+  GPIO_SEL1       = 0x10,    /* GPIO27 */
+  GPIO_SHDWN      = 0x20,    /* GPIO28 */
+  GPIO_DITHER     = 0x40,    /* GPIO29 */
+  GPIO_RANDOM     = 0x80     /* GPIO20 */
+};
+
+int rf103_led_on(rf103_t *this, uint8_t led_pattern)
 {
-  switch (color) {
-    case LED_RED:
-    case LED_YELLOW:
-    case LED_BLUE:
-      return usb_device_gpio_on(this->usb_device, color);
-    default:
-      fprintf(stderr, "ERROR - invalid LED color: 0x%02x\n", color);
-      return -1;
+  if (led_pattern & ~(GPIO_LED_RED | GPIO_LED_YELLOW | GPIO_LED_BLUE)) {
+    fprintf(stderr, "ERROR - invalid LED pattern: 0x%02x\n", led_pattern);
+    return -1;
+  }
+  return usb_device_gpio_on(this->usb_device, led_pattern);
+}
+
+
+int rf103_led_off(rf103_t *this, uint8_t led_pattern)
+{
+  if (led_pattern & ~(GPIO_LED_RED | GPIO_LED_YELLOW | GPIO_LED_BLUE)) {
+    fprintf(stderr, "ERROR - invalid LED pattern: 0x%02x\n", led_pattern);
+    return -1;
+  }
+  return usb_device_gpio_off(this->usb_device, led_pattern);
+}
+
+
+int rf103_led_toggle(rf103_t *this, uint8_t led_pattern)
+{
+  if (led_pattern & ~(GPIO_LED_RED | GPIO_LED_YELLOW | GPIO_LED_BLUE)) {
+    fprintf(stderr, "ERROR - invalid LED pattern: 0x%02x\n", led_pattern);
+    return -1;
+  }
+  return usb_device_gpio_toggle(this->usb_device, led_pattern);
+}
+
+
+int rf103_adc_dither(rf103_t *this, int dither)
+{
+  if (dither) {
+    return usb_device_gpio_on(this->usb_device, GPIO_DITHER);
+  } else {
+    return usb_device_gpio_off(this->usb_device, GPIO_DITHER);
   }
 }
 
 
-int rf103_led_off(rf103_t *this, uint8_t color)
+int rf103_adc_random(rf103_t *this, int random)
 {
-  switch (color) {
-    case LED_RED:
-    case LED_YELLOW:
-    case LED_BLUE:
-      return usb_device_gpio_off(this->usb_device, color);
-    default:
-      fprintf(stderr, "ERROR - invalid LED color: 0x%02x\n", color);
-      return -1;
-  }
-}
-
-
-int rf103_led_toggle(rf103_t *this, uint8_t color)
-{
-  switch (color) {
-    case LED_RED:
-    case LED_YELLOW:
-    case LED_BLUE:
-      return usb_device_gpio_toggle(this->usb_device, color);
-    default:
-      fprintf(stderr, "ERROR - invalid LED color: 0x%02x\n", color);
-      return -1;
+  if (random) {
+    return usb_device_gpio_on(this->usb_device, GPIO_RANDOM);
+  } else {
+    return usb_device_gpio_off(this->usb_device, GPIO_RANDOM);
   }
 }
