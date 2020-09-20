@@ -406,6 +406,33 @@ int usb_device_gpio_toggle(usb_device_t *this, uint8_t bit_pattern) {
 }
 
 
+int usb_device_i2c_write(usb_device_t *this, uint8_t i2c_address,
+                         uint8_t register_address, uint8_t *data,
+                         uint8_t length) {
+  return usb_device_control(this, I2CWFX3, (uint16_t) i2c_address,
+                            (uint16_t) register_address, data,
+                            (uint16_t) length);
+}
+
+
+int usb_device_i2c_write_byte(usb_device_t *this, uint8_t i2c_address,
+                              uint8_t register_address, uint8_t value) {
+  uint8_t data[] = { value };
+  return usb_device_control(this, I2CWFX3, (uint16_t) i2c_address,
+                            (uint16_t) register_address, data,
+                            sizeof(data));
+}
+
+
+int usb_device_i2c_read(usb_device_t *this, uint8_t i2c_address,
+                        uint8_t register_address, uint8_t *data,
+                        uint8_t length) {
+  return usb_device_control(this, I2CRFX3, (uint16_t) i2c_address,
+                            (uint16_t) register_address, data,
+                            (uint16_t) length);
+}
+
+
 /* internal functions */
 static libusb_device_handle *find_usb_device(int index,
                              libusb_device **device, int *needs_firmware)

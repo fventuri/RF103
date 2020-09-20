@@ -37,7 +37,7 @@ struct rf103_device_info {
   unsigned char *serial_number;
 };
 
-enum {
+enum LEDColors {
   LED_RED    = 0x01,
   LED_YELLOW = 0x02,
   LED_BLUE   = 0x04

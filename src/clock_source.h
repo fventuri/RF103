@@ -22,6 +22,8 @@
 #ifndef __CLOCK_SOURCE_H
 #define __CLOCK_SOURCE_H
 
+#include "usb_device.h"
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,9 +31,17 @@ extern "C" {
 
 typedef struct clock_source clock_source_t;
 
-clock_source_t *clock_source_open();
+clock_source_t *clock_source_open(usb_device_t *usb_device);
 
 void clock_source_close(clock_source_t *this);
+
+void clock_source_set_crystal_frequency(clock_source_t *this, 
+                                        double crystal_frequency);
+
+void clock_source_set_frequency_correction(clock_source_t *this,
+                                           double frequency_correction);
+
+int clock_source_set_clock(clock_source_t *this, int index, double frequency);
 
 #ifdef __cplusplus
 }

@@ -68,6 +68,17 @@ int usb_device_gpio_off(usb_device_t *this, uint8_t bit_pattern);
 
 int usb_device_gpio_toggle(usb_device_t *this, uint8_t bit_pattern);
 
+int usb_device_i2c_write(usb_device_t *this, uint8_t i2c_address,
+                         uint8_t register_address, uint8_t *data,
+                         uint8_t length);
+
+int usb_device_i2c_write_byte(usb_device_t *this, uint8_t i2c_address,
+                              uint8_t register_address, uint8_t value);
+
+int usb_device_i2c_read(usb_device_t *this, uint8_t i2c_address,
+                        uint8_t register_address, uint8_t *data,
+                        uint8_t length);
+
 #ifdef __cplusplus
 }
 #endif

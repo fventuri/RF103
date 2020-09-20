@@ -35,6 +35,14 @@ typedef struct rf103 rf103_t;
 static uint8_t initial_gpio_register();
 
 
+enum RFMode {
+  NO_RF_MODE,
+  VLF_MODE,
+  HF_MODE,
+  VHF_MODE
+};
+
+
 typedef struct rf103 {
   usb_device_t *usb_device;
   clock_source_t *clock_source;
@@ -106,7 +114,7 @@ rf103_t *rf103_open(int index, const char* imagefile)
     goto FAIL0;
   }
 
-  clock_source_t *clock_source = clock_source_open();
+  clock_source_t *clock_source = clock_source_open(usb_device);
   if (clock_source == 0) {
     fprintf(stderr, "ERROR - clock_source_open() failed\n");
     goto FAIL1;
@@ -139,7 +147,7 @@ void rf103_close(rf103_t *this)
  * GPIO related functions
  ***************************/
 
-enum {
+enum GPIOBits {
   GPIO_LED_RED    = 0x01,    /* GPIO21 */
   GPIO_LED_YELLOW = 0x02,    /* GPIO22 */
   GPIO_LED_BLUE   = 0x04,    /* GPIO23 */
