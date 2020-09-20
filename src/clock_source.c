@@ -43,6 +43,7 @@
 typedef struct clock_source clock_source_t;
 
 /* internal functions */
+static int power_down_clocks(clock_source_t *this);
 static void rational_approximation(double value, uint32_t max_denominator,
                                    uint32_t *a, uint32_t *b, uint32_t *c);
 static int configure_clock_input_and_pll(clock_source_t *this, int index,
@@ -102,30 +103,19 @@ clock_source_t *clock_source_open(usb_device_t *usb_device)
     return ret_val;
   }
 
-  /* power down all the clocks to save power */
-  uint8_t data[] = {
-    SI5351_VALUE_CLK_PDN,
-    SI5351_VALUE_CLK_PDN,
-    SI5351_VALUE_CLK_PDN,
-    SI5351_VALUE_CLK_PDN,
-    SI5351_VALUE_CLK_PDN,
-    SI5351_VALUE_CLK_PDN,
-    SI5351_VALUE_CLK_PDN,
-    SI5351_VALUE_CLK_PDN
-  };
-  ret = usb_device_i2c_write(usb_device, SI5351_ADDR,
-                             SI5351_REGISTER_CLK_BASE,
-                             data, sizeof(data));
-  if (ret < 0) {
-    log_error("usb_device_i2c_write() failed", __func__, __FILE__, __LINE__);
-    return ret_val;
-  }
-
   /* we are good here - create and initialize the clock_source */
   clock_source_t *this = (clock_source_t *) malloc(sizeof(clock_source_t));
   this->usb_device = usb_device;
   this->crystal_frequency = SI5351_FREQ;
   this->frequency_correction = SI5351_FREQ_CORR;
+
+  /* power down all the clocks to save power */
+  ret = power_down_clocks(this);
+  if (ret < 0) {
+    log_error("power_down_clocks() failed", __func__, __FILE__, __LINE__);
+    free(this);
+    return ret_val;
+  }
 
   ret_val = this;
   return ret_val;
@@ -134,6 +124,10 @@ clock_source_t *clock_source_open(usb_device_t *usb_device)
 
 void clock_source_close(clock_source_t *this)
 {
+  int ret = power_down_clocks(this);
+  if (ret < 0) {
+    log_error("power_down_clocks() failed", __func__, __FILE__, __LINE__);
+  }
   free(this);
   return;
 }
@@ -215,6 +209,29 @@ int clock_source_set_clock(clock_source_t *this, int index, double frequency)
 
 /* internal functions */
 
+static int power_down_clocks(clock_source_t *this)
+{
+  uint8_t data[] = {
+    SI5351_VALUE_CLK_PDN,
+    SI5351_VALUE_CLK_PDN,
+    SI5351_VALUE_CLK_PDN,
+    SI5351_VALUE_CLK_PDN,
+    SI5351_VALUE_CLK_PDN,
+    SI5351_VALUE_CLK_PDN,
+    SI5351_VALUE_CLK_PDN,
+    SI5351_VALUE_CLK_PDN
+  };
+  int ret = usb_device_i2c_write(this->usb_device, SI5351_ADDR,
+                                 SI5351_REGISTER_CLK_BASE,
+                                 data, sizeof(data));
+  if (ret < 0) {
+    log_error("usb_device_i2c_write() failed", __func__, __FILE__, __LINE__);
+    return -1;
+  }
+  return 0;
+}
+
+
 /* best rational approximation:
  *
  *     value ~= a + b/c     (where b <= max_denominator)
@@ -275,7 +292,7 @@ static int configure_clock_input_and_pll(clock_source_t *this, int index,
   uint32_t msn_p2 = 128 * b  - c * b_over_c;
   uint32_t msn_p3 = c;
 
-  uint8_t msn_data[] = {
+  uint8_t data[] = {
     (msn_p3 & 0x0000ff00) >>  8,
     (msn_p3 & 0x000000ff) >>  0,
     (msn_p1 & 0x00030000) >> 16,
@@ -293,7 +310,7 @@ static int configure_clock_input_and_pll(clock_source_t *this, int index,
     msn_register = SI5351_REGISTER_MSNB_BASE;
   }
   int ret = usb_device_i2c_write(this->usb_device, SI5351_ADDR, msn_register,
-                                 msn_data, sizeof(msn_data));
+                                 data, sizeof(data));
   if (ret < 0) {
     log_error("usb_device_i2c_write() failed", __func__, __FILE__, __LINE__);
     return -1;
@@ -312,7 +329,7 @@ static int configure_clock_output(clock_source_t *this, int index,
   uint32_t ms_p2 = 0;
   uint32_t ms_p3 = 1;
 
-  uint8_t ms_data[] = {
+  uint8_t data[] = {
     (ms_p3 & 0x0000ff00) >>  8,
     (ms_p3 & 0x000000ff) >>  0,
     rdiv << 5 | (ms_p1 & 0x00030000) >> 16,
@@ -330,7 +347,7 @@ static int configure_clock_output(clock_source_t *this, int index,
     ms_register = SI5351_REGISTER_MS1_BASE;
   }
   int ret = usb_device_i2c_write(this->usb_device, SI5351_ADDR, ms_register,
-                                 ms_data, sizeof(ms_data));
+                                 data, sizeof(data));
   if (ret < 0) {
     log_error("usb_device_i2c_write() failed", __func__, __FILE__, __LINE__);
     return -1;
