@@ -44,6 +44,7 @@ enum RFMode {
 
 
 typedef struct rf103 {
+  enum RF103Status status;
   usb_device_t *usb_device;
   clock_source_t *clock_source;
 } rf103_t;
@@ -121,6 +122,7 @@ rf103_t *rf103_open(int index, const char* imagefile)
   }
 
   rf103_t *this = (rf103_t *) malloc(sizeof(rf103_t));
+  this->status = STATUS_READY;
   this->usb_device = usb_device;
   this->clock_source = clock_source;
 
@@ -140,6 +142,12 @@ void rf103_close(rf103_t *this)
   usb_device_close(this->usb_device);
   free(this);
   return;
+}
+
+
+enum RF103Status rf103_status(rf103_t *this)
+{
+  return this->status;
 }
 
 

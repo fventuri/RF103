@@ -36,7 +36,6 @@
 #include <fcntl.h>
 
 #include "clock_source.h"
-#include "usb_device.h"
 #include "logging.h"
 
 

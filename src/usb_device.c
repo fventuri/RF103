@@ -36,6 +36,7 @@
 #include <libusb.h>
 
 #include "usb_device.h"
+#include "usb_device_internals.h"
 #include "logging.h"
 
 
@@ -49,18 +50,10 @@ static int load_image(libusb_device_handle *dev_handle,
 static int validate_image(const uint8_t *image, const size_t size);
 static int transfer_image(const uint8_t *image,
                           libusb_device_handle *dev_handle);
-static int list_endpoints(uint8_t endpoints[][2], libusb_device *device);
+static int list_endpoints(struct libusb_endpoint_descriptor endpoints[],
+                          struct libusb_ss_endpoint_companion_descriptor ss_endpoints[],
+                          libusb_device *device);
 
-
-typedef struct usb_device {
-  libusb_device *dev;
-  libusb_device_handle *dev_handle;
-  int nendpoints;
-#define MAX_ENDPOINTS (16)
-  uint8_t endpoints[MAX_ENDPOINTS][2];
-  uint8_t bulk_in_endpoint;
-  uint8_t gpio_register;
-} usb_device_t;
 
 struct usb_device_id {
   uint16_t vid;
@@ -279,22 +272,28 @@ usb_device_t *usb_device_open(int index, const char* imagefile,
   }
 
   /* list endpoints */
-  uint8_t endpoints[MAX_ENDPOINTS][2];
-  ret = list_endpoints(endpoints, device);
+  struct libusb_endpoint_descriptor endpoints[MAX_ENDPOINTS];
+  struct libusb_ss_endpoint_companion_descriptor ss_endpoints[MAX_ENDPOINTS];
+  ret = list_endpoints(endpoints, ss_endpoints, device);
   if (ret < 0) {
     log_error("list_endpoints() failed", __func__, __FILE__, __LINE__);
     goto FAIL2;
   }
   int nendpoints = ret;
-  uint8_t bulk_in_endpoint = 0;
+  uint8_t bulk_in_endpoint_address = 0;
+  uint16_t bulk_in_max_packet_size = 0;
+  uint8_t bulk_in_max_burst = 0;
   for (int i = 0; i < nendpoints; ++i) {
-    if ((endpoints[i][1] & 0x03) == LIBUSB_TRANSFER_TYPE_BULK &&
-        (endpoints[i][0] & 0x80) == LIBUSB_ENDPOINT_IN) {
-      bulk_in_endpoint = endpoints[i][0];
+    if ((endpoints[i].bmAttributes & 0x03) == LIBUSB_TRANSFER_TYPE_BULK &&
+        (endpoints[i].bEndpointAddress & 0x80) == LIBUSB_ENDPOINT_IN) {
+      bulk_in_endpoint_address = endpoints[i].bEndpointAddress;
+      bulk_in_max_packet_size = endpoints[i].wMaxPacketSize;
+      bulk_in_max_burst = ss_endpoints[i].bLength == 0 ? 0 :
+                          ss_endpoints[i].bMaxBurst;
       break;
     }
   }
-  if (bulk_in_endpoint == 0) {
+  if (bulk_in_endpoint_address == 0) {
     fprintf(stderr, "ERROR - bulk in endpoint not found\n");
     goto FAIL2;
   }
@@ -306,10 +305,12 @@ usb_device_t *usb_device_open(int index, const char* imagefile,
   this->nendpoints = nendpoints;
   memset(this->endpoints, 0, sizeof(this->endpoints));
   for (int i = 0; i < nendpoints; ++i) {
-    this->endpoints[i][0] = endpoints[i][0];
-    this->endpoints[i][1] = endpoints[i][1];
+    this->endpoints[i] = endpoints[i];
+    this->ss_endpoints[i] = ss_endpoints[i];
   }
-  this->bulk_in_endpoint = bulk_in_endpoint;
+  this->bulk_in_endpoint_address = bulk_in_endpoint_address;
+  this->bulk_in_max_packet_size = bulk_in_max_packet_size;
+  this->bulk_in_max_burst = bulk_in_max_burst;
   this->gpio_register = gpio_register;
 
   ret_val = this;
@@ -674,7 +675,9 @@ static int transfer_image(const uint8_t *image,
 }
 
 
-static int list_endpoints(uint8_t endpoints[][2], libusb_device *device)
+static int list_endpoints(struct libusb_endpoint_descriptor endpoints[],
+                          struct libusb_ss_endpoint_companion_descriptor ss_endpoints[],
+                          libusb_device *device)
 {
   struct libusb_config_descriptor *config;
   int ret = libusb_get_active_config_descriptor(device, &config);
@@ -696,8 +699,20 @@ static int list_endpoints(uint8_t endpoints[][2], libusb_device *device)
           fprintf(stderr, "WARNING - found too many USB endpoints; returning only the first %d\n", MAX_ENDPOINTS);
           return count;
         }
-        endpoints[count][0] = endpoint->bEndpointAddress;
-        endpoints[count][1] = endpoint->bmAttributes;
+        endpoints[count] = *endpoint;
+        struct libusb_ss_endpoint_companion_descriptor *endpoint_ss_companion;
+        ret = libusb_get_ss_endpoint_companion_descriptor(0, endpoint,
+                &endpoint_ss_companion);
+        if (ret < 0 && ret != LIBUSB_ERROR_NOT_FOUND) {
+          log_usb_error(ret, __func__, __FILE__, __LINE__);
+          return -1;
+        }
+        if (ret == 0) {
+          ss_endpoints[count] = *endpoint_ss_companion;
+        } else {
+          ss_endpoints[count].bLength = 0;
+        }
+        libusb_free_ss_endpoint_companion_descriptor(endpoint_ss_companion);
         count++;
       }
     }

@@ -37,6 +37,13 @@ struct rf103_device_info {
   unsigned char *serial_number;
 };
 
+enum RF103Status {
+  STATUS_OFF,
+  STATUS_READY,
+  STATUS_STREAMING,
+  STATUS_FAILED = 0xff
+};
+
 enum LEDColors {
   LED_RED    = 0x01,
   LED_YELLOW = 0x02,
@@ -55,6 +62,8 @@ rf103_t *rf103_open(int index, const char* imagefile);
 
 void rf103_close(rf103_t *this);
 
+enum RF103Status rf103_status(rf103_t *this);
+
 
 /* GPIO related functions */
 int rf103_led_on(rf103_t *this, uint8_t led_pattern);
@@ -66,6 +75,11 @@ int rf103_led_toggle(rf103_t *this, uint8_t led_pattern);
 int rf103_adc_dither(rf103_t *this, int dither);
 
 int rf103_adc_random(rf103_t *this, int dither);
+
+
+/* ADC/bulk transfer related functions */
+typedef void (*rf103_read_async_cb_t)(uint32_t data_size, uint8_t *data,
+                                      void *context);
 
 
 #ifdef __cplusplus
