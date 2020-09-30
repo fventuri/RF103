@@ -28,6 +28,7 @@
 #include "logging.h"
 #include "usb_device.h"
 #include "clock_source.h"
+#include "adc.h"
 
 typedef struct rf103 rf103_t;
 
@@ -47,12 +48,13 @@ typedef struct rf103 {
   enum RF103Status status;
   usb_device_t *usb_device;
   clock_source_t *clock_source;
+  adc_t *adc;
 } rf103_t;
 
 
-/***************************
+/******************************
  * basic functions
- ***************************/
+ ******************************/
 
 int rf103_get_device_count()
 {
@@ -125,6 +127,7 @@ rf103_t *rf103_open(int index, const char* imagefile)
   this->status = STATUS_READY;
   this->usb_device = usb_device;
   this->clock_source = clock_source;
+  this->adc = 0;
 
   ret_val = this;
   return ret_val;
@@ -138,6 +141,7 @@ FAIL0:
 
 void rf103_close(rf103_t *this)
 {
+  adc_close(this->adc);
   clock_source_close(this->clock_source);
   usb_device_close(this->usb_device);
   free(this);
@@ -151,9 +155,9 @@ enum RF103Status rf103_status(rf103_t *this)
 }
 
 
-/***************************
+/******************************
  * GPIO related functions
- ***************************/
+ ******************************/
 
 enum GPIOBits {
   GPIO_LED_RED    = 0x01,    /* GPIO21 */
@@ -220,4 +224,49 @@ int rf103_adc_random(rf103_t *this, int random)
   } else {
     return usb_device_gpio_off(this->usb_device, GPIO_RANDOM);
   }
+}
+
+
+/******************************
+ * streaming related functions
+ ******************************/
+
+int rf103_set_async_params(rf103_t *this, uint32_t frame_size,
+                           uint32_t num_frames, rf103_read_async_cb_t callback,
+                           void *callback_context)
+{
+  adc_t *adc = adc_open_async(this->usb_device, frame_size, num_frames,
+                              callback, callback_context);
+  if (adc == 0) {
+    fprintf(stderr, "ERROR - adc_open_async() failed\n");
+    return -1;
+  }
+
+  return 0;
+}
+
+
+int rf103_start_streaming(rf103_t *this)
+{
+  // TODO - start clock_source
+  int ret = adc_start(this->adc);
+  if (ret < 0) {
+    fprintf(stderr, "ERROR - adc_start() failed\n");
+    return -1;
+  }
+
+  return 0;
+}
+
+
+int rf103_stop_streaming(rf103_t *this)
+{
+  int ret = adc_stop(this->adc);
+  if (ret < 0) {
+    fprintf(stderr, "ERROR - adc_stop() failed\n");
+    return -1;
+  }
+  // TODO - stop clock_source
+
+  return 0;
 }

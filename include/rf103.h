@@ -77,10 +77,17 @@ int rf103_adc_dither(rf103_t *this, int dither);
 int rf103_adc_random(rf103_t *this, int dither);
 
 
-/* ADC/bulk transfer related functions */
+/* streaming related functions */
 typedef void (*rf103_read_async_cb_t)(uint32_t data_size, uint8_t *data,
                                       void *context);
 
+int rf103_set_async_params(rf103_t *this, uint32_t frame_size, 
+                           uint32_t num_frames, rf103_read_async_cb_t callback,
+                           void *callback_context);
+
+int rf103_start_streaming(rf103_t *this);
+
+int rf103_stop_streaming(rf103_t *this);
 
 #ifdef __cplusplus
 }
