@@ -31,6 +31,12 @@ extern "C" {
 
 typedef struct clock_source clock_source_t;
 
+enum ClockSourceIndex {
+  ADC_CLOCK = 0,
+  TUNER_CLOCK = 1
+};
+
+
 clock_source_t *clock_source_open(usb_device_t *usb_device);
 
 void clock_source_close(clock_source_t *this);
@@ -42,6 +48,10 @@ void clock_source_set_frequency_correction(clock_source_t *this,
                                            double frequency_correction);
 
 int clock_source_set_clock(clock_source_t *this, int index, double frequency);
+
+int clock_source_start_clock(clock_source_t *this, int index);
+
+int clock_source_stop_clock(clock_source_t *this, int index);
 
 #ifdef __cplusplus
 }

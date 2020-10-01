@@ -81,6 +81,8 @@ int rf103_adc_random(rf103_t *this, int dither);
 typedef void (*rf103_read_async_cb_t)(uint32_t data_size, uint8_t *data,
                                       void *context);
 
+int rf103_set_sample_rate(rf103_t *this, double sample_rate);
+
 int rf103_set_async_params(rf103_t *this, uint32_t frame_size, 
                            uint32_t num_frames, rf103_read_async_cb_t callback,
                            void *callback_context);

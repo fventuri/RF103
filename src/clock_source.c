@@ -49,7 +49,6 @@ static int configure_clock_input_and_pll(clock_source_t *this, int index,
                                          uint32_t a, uint32_t b, uint32_t c);
 static int configure_clock_output(clock_source_t *this, int index,
                                   uint32_t output_ms, uint8_t rdiv);
-static int reset_pll_and_clock_power_up(clock_source_t *this, int index);
 
 
 typedef struct clock_source {
@@ -195,10 +194,53 @@ int clock_source_set_clock(clock_source_t *this, int index, double frequency)
     return -1;
   }
 
-  /* finally reset the PLL and power up the clock */
-  ret = reset_pll_and_clock_power_up(this, index);
+  return 0;
+}
+
+
+int clock_source_start_clock(clock_source_t *this, int index)
+{
+  /* reset the PLL */
+  uint8_t pll_reset;
+  if (index == 0) {
+    pll_reset = SI5351_VALUE_PLLA_RESET;
+  } else if (index == 1) {
+    pll_reset = SI5351_VALUE_PLLB_RESET;
+  }
+  int ret = usb_device_i2c_write_byte(this->usb_device, SI5351_ADDR,
+                                      SI5351_REGISTER_PLL_RESET, pll_reset);
   if (ret < 0) {
-    fprintf(stderr, "ERROR - reset_pll_and_clock_power_up() failed\n");
+    log_error("usb_device_i2c_write_byte() failed", __func__, __FILE__, __LINE__);
+    return -1;
+  }
+
+  /* power up the clock */
+  uint8_t clock_control = SI5351_VALUE_MS_INT | SI5351_VALUE_CLK_SRC_MS | SI5351_VALUE_CLK_DRV_8MA;
+  if (index == 0) {
+    clock_control |= SI5351_VALUE_MS_SRC_PLLA;
+  } else if (index == 1) {
+    clock_control |= SI5351_VALUE_MS_SRC_PLLB;
+  }
+  ret = usb_device_i2c_write_byte(this->usb_device, SI5351_ADDR,
+                                  SI5351_REGISTER_CLK_BASE + index,
+                                  clock_control);
+  if (ret < 0) {
+    log_error("usb_device_i2c_write_byte() failed", __func__, __FILE__, __LINE__);
+    return -1;
+  }
+
+  return 0;
+}
+
+
+int clock_source_stop_clock(clock_source_t *this, int index)
+{
+  /* power down the clock */
+  int ret = usb_device_i2c_write_byte(this->usb_device, SI5351_ADDR,
+                                      SI5351_REGISTER_CLK_BASE + index,
+                                      SI5351_VALUE_CLK_PDN);
+  if (ret < 0) {
+    log_error("usb_device_i2c_write_byte() failed", __func__, __FILE__, __LINE__);
     return -1;
   }
 
@@ -349,39 +391,6 @@ static int configure_clock_output(clock_source_t *this, int index,
                                  data, sizeof(data));
   if (ret < 0) {
     log_error("usb_device_i2c_write() failed", __func__, __FILE__, __LINE__);
-    return -1;
-  }
-
-  return 0;
-}
-
-
-static int reset_pll_and_clock_power_up(clock_source_t *this, int index)
-{
-  uint8_t pll_reset;
-  if (index == 0) {
-    pll_reset = SI5351_VALUE_PLLA_RESET;
-  } else if (index == 1) {
-    pll_reset = SI5351_VALUE_PLLB_RESET;
-  }
-  int ret = usb_device_i2c_write_byte(this->usb_device, SI5351_ADDR,
-                                      SI5351_REGISTER_PLL_RESET, pll_reset);
-  if (ret < 0) {
-    log_error("usb_device_i2c_write_byte() failed", __func__, __FILE__, __LINE__);
-    return -1;
-  }
-
-  uint8_t clock_control = SI5351_VALUE_MS_INT | SI5351_VALUE_CLK_SRC_MS | SI5351_VALUE_CLK_DRV_8MA;
-  if (index == 0) {
-    clock_control |= SI5351_VALUE_MS_SRC_PLLA;
-  } else if (index == 1) {
-    clock_control |= SI5351_VALUE_MS_SRC_PLLB;
-  }
-  ret = usb_device_i2c_write_byte(this->usb_device, SI5351_ADDR,
-                                  SI5351_REGISTER_CLK_BASE + index,
-                                  clock_control);
-  if (ret < 0) {
-    log_error("usb_device_i2c_write_byte() failed", __func__, __FILE__, __LINE__);
     return -1;
   }
 

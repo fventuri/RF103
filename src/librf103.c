@@ -49,6 +49,7 @@ typedef struct rf103 {
   usb_device_t *usb_device;
   clock_source_t *clock_source;
   adc_t *adc;
+  double sample_rate;
 } rf103_t;
 
 
@@ -128,6 +129,7 @@ rf103_t *rf103_open(int index, const char* imagefile)
   this->usb_device = usb_device;
   this->clock_source = clock_source;
   this->adc = 0;
+  this->sample_rate = 0;    /* default sample rate */
 
   ret_val = this;
   return ret_val;
@@ -231,6 +233,14 @@ int rf103_adc_random(rf103_t *this, int random)
  * streaming related functions
  ******************************/
 
+int rf103_set_sample_rate(rf103_t *this, double sample_rate)
+{
+  /* no checks yet */
+  this->sample_rate = sample_rate;
+  return 0;
+}
+
+
 int rf103_set_async_params(rf103_t *this, uint32_t frame_size,
                            uint32_t num_frames, rf103_read_async_cb_t callback,
                            void *callback_context)
@@ -248,22 +258,48 @@ int rf103_set_async_params(rf103_t *this, uint32_t frame_size,
 
 int rf103_start_streaming(rf103_t *this)
 {
-  // TODO - start clock_source
-  int ret = adc_start(this->adc);
+  int ret = clock_source_set_clock(this->clock_source, ADC_CLOCK, this->sample_rate);
+  if (ret < 0) {
+    fprintf(stderr, "ERROR - clock_source_set_clock() failed\n");
+    return -1;
+  }
+  ret = clock_source_start_clock(this->clock_source, ADC_CLOCK);
+  if (ret < 0) {
+    fprintf(stderr, "ERROR - clock_source_start_clock() failed\n");
+    return -1;
+  }
+  adc_set_sample_rate(this->adc, (uint32_t) this->sample_rate);
+  ret = adc_start(this->adc);
   if (ret < 0) {
     fprintf(stderr, "ERROR - adc_start() failed\n");
     return -1;
   }
+  ret = usb_device_control(this->usb_device, STARTFX3, 0, 0, 0, 0);
+  if (ret < 0) {
+    fprintf(stderr, "ERROR - usb_device_control(STARTFX3) failed\n");
+    return -1;
+  }
 
+  /* all good */
   return 0;
 }
 
 
 int rf103_stop_streaming(rf103_t *this)
 {
-  int ret = adc_stop(this->adc);
+  int ret = usb_device_control(this->usb_device, STOPFX3, 0, 0, 0, 0);
+  if (ret < 0) {
+    fprintf(stderr, "ERROR - usb_device_control(STOPFX3) failed\n");
+    return -1;
+  }
+  ret = adc_stop(this->adc);
   if (ret < 0) {
     fprintf(stderr, "ERROR - adc_stop() failed\n");
+    return -1;
+  }
+  ret = clock_source_stop_clock(this->clock_source, ADC_CLOCK);
+  if (ret < 0) {
+    fprintf(stderr, "ERROR - clock_source_stop_clock() failed\n");
     return -1;
   }
   // TODO - stop clock_source
