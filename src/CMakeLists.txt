@@ -24,6 +24,8 @@ target_link_libraries(rf103 PkgConfig::LIBUSB)
 # applications
 add_executable(rf103_test rf103_test.c)
 target_link_libraries(rf103_test rf103)
+add_executable(rf103_stream_test rf103_stream_test.c)
+target_link_libraries(rf103_stream_test rf103)
 
 
 # install
