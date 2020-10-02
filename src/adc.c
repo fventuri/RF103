@@ -72,6 +72,7 @@ typedef struct adc {
 static const uint32_t DEFAULT_ADC_SAMPLE_RATE = 64000000;   /* 64Msps */
 static const uint32_t DEFAULT_ADC_FRAME_SIZE = 16 * 1024;   /* 16kB */
 static const uint32_t DEFAULT_ADC_NUM_FRAMES = 64;
+const unsigned int BULK_XFER_TIMEOUT = 5000; // timeout (in ms) for each bulk transfer
 
 
 adc_t *adc_open_sync(usb_device_t *usb_device)
@@ -106,8 +107,6 @@ adc_t *adc_open_async(usb_device_t *usb_device, uint32_t frame_size,
                       uint32_t num_frames, rf103_read_async_cb_t callback,
                       void *callback_context)
 {
-  const unsigned int bulk_xfer_timeout = 5000; // timeout (in ms) for each bulk transfer
-
   adc_t *ret_val = 0;
 
   /* we must have a bulk in device to transfer data from */
@@ -157,7 +156,7 @@ adc_t *adc_open_async(usb_device_t *usb_device, uint32_t frame_size,
     libusb_fill_bulk_transfer(&transfers[i], usb_device->dev_handle, 
                               usb_device->bulk_in_endpoint_address,
                               frames[i], frame_size, adc_read_async_callback,
-                              this, bulk_xfer_timeout);
+                              this, BULK_XFER_TIMEOUT);
   }
   this->transfers = transfers;
   atomic_init(&this->active_transfers, 0);
@@ -199,6 +198,12 @@ int adc_start(adc_t *this)
     return -1;
   }
 
+  /* if there is no callback, then streaming is synchronous - nothing to do */
+  if (this->callback == 0) {
+    this->status = ADC_STATUS_STREAMING;
+    return 0;
+  }
+
   /* submit all the transfers */
   atomic_init(&this->active_transfers, 0);
   for (uint32_t i = 0; i < this->num_frames; ++i) {
@@ -219,6 +224,14 @@ int adc_start(adc_t *this)
 
 int adc_stop(adc_t *this)
 {
+  /* if there is no callback, then streaming is synchronous - nothing to do */
+  if (this->callback == 0) {
+    if (this->status == ADC_STATUS_STREAMING) {
+      this->status = ADC_STATUS_READY;
+    }
+    return 0;
+  }
+
   this->status = ADC_STATUS_CANCELLED;
   /* cancel all the active transfers */
   for (uint32_t i = 0; i < this->num_frames; ++i) {
@@ -240,6 +253,45 @@ int adc_stop(adc_t *this)
     this->status = ADC_STATUS_FAILED;
   }
 
+  return 0;
+}
+
+
+int adc_reset_status(adc_t *this)
+{
+  switch (this->status) {
+    case ADC_STATUS_READY:
+      /* nothing to do here */
+      return 0;
+    case ADC_STATUS_CANCELLED:
+    case ADC_STATUS_FAILED:
+      if (this->active_transfers > 0) {
+        fprintf(stderr, "ERROR - adc_reset_status() called with %d transfers still active\n",
+                        this->active_transfers);
+        return -1;
+      }
+      break;
+    default:
+      fprintf(stderr, "ERROR - adc_reset_status() called with invalid status: %d\n",
+                      this->status);
+      return -1;
+  }
+
+  /* we are good here; reset the status */
+  this->status = ADC_STATUS_READY;
+  return 0;
+}
+
+
+int adc_read_sync(adc_t *this, uint8_t *data, int length, int *transferred)
+{
+  int ret = libusb_bulk_transfer(this->usb_device->dev_handle,
+                                 this->usb_device->bulk_in_endpoint_address,
+                                 data, length, transferred, BULK_XFER_TIMEOUT);
+  if (ret < 0) {
+    log_usb_error(ret, __func__, __FILE__, __LINE__);
+    return -1;
+  }
   return 0;
 }
 
@@ -269,8 +321,7 @@ static void adc_read_async_callback(struct libusb_transfer *transfer)
       }
       return;
     default:
-      fprintf(stderr, "ERROR - bulk transfer failed with error: %s\n",
-              libusb_error_name(transfer->status));
+      log_usb_error(transfer->status, __func__, __FILE__, __LINE__);
       break;
   }
 

@@ -46,6 +46,10 @@ int adc_start(adc_t *this);
 
 int adc_stop(adc_t *this);
 
+int adc_reset_status(adc_t *this);
+
+int adc_read_sync(adc_t *this, uint8_t *data, int length, int *transferred);
+
 #ifdef __cplusplus
 }
 #endif

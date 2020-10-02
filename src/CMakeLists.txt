@@ -33,6 +33,6 @@ install(TARGETS rf103
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
-install(TARGETS rf103_test
+install(TARGETS rf103_test rf103_stream_test
   DESTINATION ${CMAKE_INSTALL_BINDIR}
 )

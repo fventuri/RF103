@@ -91,6 +91,10 @@ int rf103_start_streaming(rf103_t *this);
 
 int rf103_stop_streaming(rf103_t *this);
 
+int rf103_reset_status(rf103_t *this);
+
+int rf103_read_sync(rf103_t *this, uint8_t *data, int length, int *transferred);
+
 #ifdef __cplusplus
 }
 #endif

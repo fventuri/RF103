@@ -302,7 +302,23 @@ int rf103_stop_streaming(rf103_t *this)
     fprintf(stderr, "ERROR - clock_source_stop_clock() failed\n");
     return -1;
   }
-  // TODO - stop clock_source
 
   return 0;
+}
+
+
+int rf103_reset_status(rf103_t *this)
+{
+  int ret = adc_reset_status(this->adc);
+  if (ret < 0) {
+    fprintf(stderr, "ERROR - adc_reset_status() failed\n");
+    return -1;
+  }
+  return 0;
+}
+
+
+int rf103_read_sync(rf103_t *this, uint8_t *data, int length, int *transferred)
+{
+  return adc_read_sync(this->adc, data, length, transferred);
 }
