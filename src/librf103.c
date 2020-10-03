@@ -226,6 +226,7 @@ int rf103_adc_random(rf103_t *this, int random)
   } else {
     return usb_device_gpio_off(this->usb_device, GPIO_RANDOM);
   }
+  adc_set_random(this->adc, random);
 }
 
 

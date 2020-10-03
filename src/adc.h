@@ -40,6 +40,8 @@ adc_t *adc_open_async(usb_device_t *usb_device, uint32_t frame_size,
 
 void adc_close(adc_t *this);
 
+int adc_set_random(adc_t *this, int random);
+
 int adc_set_sample_rate(adc_t *this, uint32_t sample_rate);
 
 int adc_start(adc_t *this);

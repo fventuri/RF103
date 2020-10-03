@@ -57,6 +57,7 @@ enum ADCStatus {
 
 typedef struct adc {
   enum ADCStatus status;
+  int random;
   usb_device_t *usb_device;
   uint32_t sample_rate;
   uint32_t frame_size;
@@ -88,6 +89,7 @@ adc_t *adc_open_sync(usb_device_t *usb_device)
   /* we are good here - create and initialize the adc */
   adc_t *this = (adc_t *) malloc(sizeof(adc_t));
   this->status = ADC_STATUS_READY;
+  this->random = 0;
   this->usb_device = usb_device;
   this->sample_rate = DEFAULT_ADC_SAMPLE_RATE;
   this->frame_size = 0;
@@ -142,6 +144,7 @@ adc_t *adc_open_async(usb_device_t *usb_device, uint32_t frame_size,
   /* we are good here - create and initialize the adc */
   adc_t *this = (adc_t *) malloc(sizeof(adc_t));
   this->status = ADC_STATUS_READY;
+  this->random = 0;
   this->usb_device = usb_device;
   this->sample_rate = DEFAULT_ADC_SAMPLE_RATE;
   this->frame_size = frame_size > 0 ? frame_size : DEFAULT_ADC_FRAME_SIZE;
@@ -180,6 +183,13 @@ void adc_close(adc_t *this)
   }
   free(this);
   return;
+}
+
+
+int adc_set_random(adc_t *this, int random)
+{
+  this->random = random;
+  return 0;
 }
 
 
@@ -292,6 +302,18 @@ int adc_read_sync(adc_t *this, uint8_t *data, int length, int *transferred)
     log_usb_error(ret, __func__, __FILE__, __LINE__);
     return -1;
   }
+
+  /* remove ADC randomization */
+  if (this->random) {
+    uint16_t *samples = (uint16_t *) data;
+    int n = *transferred / 2;
+    for (int i = 0; i < n; ++i) {
+      if (samples[i] & 1) {
+        samples[i] ^= 0xfffe;
+      }
+    }
+  }
+
   return 0;
 }
 
@@ -305,6 +327,16 @@ static void adc_read_async_callback(struct libusb_transfer *transfer)
     case LIBUSB_TRANSFER_COMPLETED:
       /* success!!! */
       if (this->status == ADC_STATUS_STREAMING) {
+        /* remove ADC randomization */
+        if (this->random) {
+          uint16_t *samples = (uint16_t *) transfer->buffer;
+          int n = transfer->actual_length / 2;
+          for (int i = 0; i < n; ++i) {
+            if (samples[i] & 1) {
+              samples[i] ^= 0xfffe;
+            }
+          }
+        }
         this->callback(transfer->actual_length, transfer->buffer,
                        this->callback_context);
         ret = libusb_submit_transfer(transfer);
