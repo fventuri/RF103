@@ -135,8 +135,8 @@ int usb_device_get_device_list(struct usb_device_info **usb_device_infos)
 
   struct usb_device_info *device_infos = (struct usb_device_info *) malloc((nusbdevices + 1) * sizeof(struct usb_device_info));
   int count = 0;
-  for (ssize_t i = 0; i < nusbdevices; ++i) {
-    libusb_device *device = list[i];
+  for (ssize_t j = 0; j < nusbdevices; ++j) {
+    libusb_device *device = list[j];
     struct libusb_device_descriptor desc;
     ret = libusb_get_device_descriptor(device, &desc);
     for (int i = 0; i < n_usb_device_ids; ++i) {
@@ -456,8 +456,8 @@ static libusb_device_handle *find_usb_device(int index,
   }
 
   int count = 0;
-  for (ssize_t i = 0; i < nusbdevices; ++i) {
-    libusb_device *dev = list[i];
+  for (ssize_t j = 0; j < nusbdevices; ++j) {
+    libusb_device *dev = list[j];
     struct libusb_device_descriptor desc;
     libusb_get_device_descriptor(dev, &desc);
     for (int i = 0; i < n_usb_device_ids; ++i) {
@@ -522,7 +522,7 @@ int load_image(libusb_device_handle *dev_handle, const char *imagefile)
   const int fx_type = FX_TYPE_FX3;
   const int img_type = IMG_TYPE_IMG;
   const int stage = 0;
-  verbose = 2;
+  verbose = 1;
   ret_val = ezusb_load_ram(dev_handle, imagefile, fx_type, img_type, stage);
   return ret_val;
 

@@ -65,7 +65,7 @@ typedef struct adc {
   rf103_read_async_cb_t callback;
   void *callback_context;
   uint8_t **frames;
-  struct libusb_transfer *transfers;
+  struct libusb_transfer **transfers;
   atomic_int active_transfers;
 } adc_t;
 
@@ -154,9 +154,10 @@ adc_t *adc_open_async(usb_device_t *usb_device, uint32_t frame_size,
   this->frames = frames;
 
   /* populate the required libusb_transfer fields */
-  struct libusb_transfer *transfers = (struct libusb_transfer *) malloc(num_frames * sizeof(struct libusb_transfer));
+  struct libusb_transfer **transfers = (struct libusb_transfer **) malloc(num_frames * sizeof(struct libusb_transfer *));
   for (uint32_t i = 0; i < num_frames; ++i) {
-    libusb_fill_bulk_transfer(&transfers[i], usb_device->dev_handle, 
+    transfers[i] = libusb_alloc_transfer(0);
+    libusb_fill_bulk_transfer(transfers[i], usb_device->dev_handle,
                               usb_device->bulk_in_endpoint_address,
                               frames[i], frame_size, adc_read_async_callback,
                               this, BULK_XFER_TIMEOUT);
@@ -171,7 +172,10 @@ adc_t *adc_open_async(usb_device_t *usb_device, uint32_t frame_size,
 
 void adc_close(adc_t *this)
 {
-  if (this->transfers != 0) {
+  if (this->transfers) {
+    for (uint32_t i = 0; i < this->num_frames; ++i) {
+      libusb_free_transfer(this->transfers[i]);
+    }
     free(this->transfers);
   }
   if (this->frames != 0) {
@@ -217,7 +221,7 @@ int adc_start(adc_t *this)
   /* submit all the transfers */
   atomic_init(&this->active_transfers, 0);
   for (uint32_t i = 0; i < this->num_frames; ++i) {
-    int ret = libusb_submit_transfer(&this->transfers[i]);
+    int ret = libusb_submit_transfer(this->transfers[i]);
     if (ret < 0) {
       log_usb_error(ret, __func__, __FILE__, __LINE__);
       this->status = ADC_STATUS_FAILED;
@@ -245,7 +249,7 @@ int adc_stop(adc_t *this)
   this->status = ADC_STATUS_CANCELLED;
   /* cancel all the active transfers */
   for (uint32_t i = 0; i < this->num_frames; ++i) {
-    int ret = libusb_cancel_transfer(&this->transfers[i]);
+    int ret = libusb_cancel_transfer(this->transfers[i]);
     if (ret < 0) {
       if (ret == LIBUSB_ERROR_NOT_FOUND) {
         continue;
