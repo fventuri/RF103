@@ -71,7 +71,7 @@ typedef struct adc {
 
 
 static const uint32_t DEFAULT_ADC_SAMPLE_RATE = 64000000;   /* 64Msps */
-static const uint32_t DEFAULT_ADC_FRAME_SIZE = 16 * 1024;   /* 16kB */
+static const uint32_t DEFAULT_ADC_FRAME_SIZE = 15360;  /* ~ 16kB: muste be multiple of 15360 */
 static const uint32_t DEFAULT_ADC_NUM_FRAMES = 64;
 const unsigned int BULK_XFER_TIMEOUT = 5000; // timeout (in ms) for each bulk transfer
 
