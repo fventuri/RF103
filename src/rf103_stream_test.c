@@ -20,6 +20,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #include "rf103.h"
@@ -34,13 +35,16 @@ static unsigned long long num_callbacks;
 
 int main(int argc, char **argv)
 {
-  if (argc != 3) {
-    fprintf(stderr, "usage: %s <image file> <sample rate>\n", argv[0]);
+  if (argc < 3) {
+    fprintf(stderr, "usage: %s <image file> <sample rate> [<runtime_in_ms>]\n", argv[0]);
     return -1;
   }
   char *imagefile = argv[1];
   double sample_rate = 0.0;
+  int runtime = 1000;
   sscanf(argv[2], "%lf", &sample_rate);
+  if (3 < argc)
+    runtime = atoi(argv[3]);
 
   if (sample_rate <= 0) {
     fprintf(stderr, "ERROR - given samplerate '%f' should be > 0\n", sample_rate);
@@ -72,10 +76,8 @@ int main(int argc, char **argv)
     return -1;
   }
 
-  fprintf(stderr, "started streaming .. for 10 seconds ..\n");
-
-  /* run for 10 sec */
-  usleep(10 * 1000 * 1000L);
+  fprintf(stderr, "started streaming .. for %d ms ..\n", runtime);
+  usleep(runtime * 1000L);
 
   if (rf103_stop_streaming(rf103) < 0) {
     fprintf(stderr, "ERROR - rf103_stop_streaming() failed\n");
@@ -83,7 +85,7 @@ int main(int argc, char **argv)
   }
 
   fprintf(stderr, "total bytes received=%llu in %llu callbacks\n", total_bytes, num_callbacks);
-  fprintf(stderr, "approx. samplerate is %llu samples/sec\n", total_bytes / (2*10) );
+  fprintf(stderr, "approx. samplerate is %llu kSamples/sec\n", total_bytes / (2*runtime) );
 
   /* done - all good */
   ret_val = 0;
