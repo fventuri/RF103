@@ -71,8 +71,8 @@ typedef struct adc {
 
 
 static const uint32_t DEFAULT_ADC_SAMPLE_RATE = 64000000;   /* 64Msps */
-static const uint32_t DEFAULT_ADC_FRAME_SIZE = 15360;  /* ~ 16kB: muste be multiple of 15360 */
-static const uint32_t DEFAULT_ADC_NUM_FRAMES = 64;
+static const uint32_t DEFAULT_ADC_FRAME_SIZE = (2 * DEFAULT_ADC_SAMPLE_RATE / 1000);  /* ~ 1 ms */
+static const uint32_t DEFAULT_ADC_NUM_FRAMES = 96;  /* we should not exceed 120 ms in total! */
 const unsigned int BULK_XFER_TIMEOUT = 5000; // timeout (in ms) for each bulk transfer
 
 
@@ -117,12 +117,20 @@ adc_t *adc_open_async(usb_device_t *usb_device, uint32_t frame_size,
     return ret_val;
   }
 
-  frame_size = frame_size > 0 ? frame_size : DEFAULT_ADC_FRAME_SIZE;
-  num_frames = num_frames > 0 ? num_frames : DEFAULT_ADC_NUM_FRAMES;
-
   /* frame size must be a multiple of max_packet_size * max_burst */
   uint32_t max_xfer_size = usb_device->bulk_in_max_packet_size *
                            usb_device->bulk_in_max_burst;
+  if ( !max_xfer_size ) {
+    fprintf(stderr, "ERROR: maximum transfer size is 0. probably not connected at USB 3 port?!\n");
+    return ret_val;
+  }
+
+  num_frames = num_frames > 0 ? num_frames : DEFAULT_ADC_NUM_FRAMES;
+  frame_size = frame_size > 0 ? frame_size : DEFAULT_ADC_FRAME_SIZE;
+  frame_size = max_xfer_size * ((frame_size +max_xfer_size -1) / max_xfer_size);  // round up
+  int iso_packets_per_frame = frame_size / usb_device->bulk_in_max_packet_size;
+  fprintf(stderr, "frame_size = %u, iso_packets_per_frame = %d\n", (unsigned)frame_size, iso_packets_per_frame);
+
   if (frame_size % max_xfer_size != 0) {
     fprintf(stderr, "ADC frame size must be a multiple of %d\n", max_xfer_size);
     return ret_val;
@@ -156,7 +164,7 @@ adc_t *adc_open_async(usb_device_t *usb_device, uint32_t frame_size,
   /* populate the required libusb_transfer fields */
   struct libusb_transfer **transfers = (struct libusb_transfer **) malloc(num_frames * sizeof(struct libusb_transfer *));
   for (uint32_t i = 0; i < num_frames; ++i) {
-    transfers[i] = libusb_alloc_transfer(0);
+    transfers[i] = libusb_alloc_transfer(0);	// iso_packets_per_frame ?
     libusb_fill_bulk_transfer(transfers[i], usb_device->dev_handle,
                               usb_device->bulk_in_endpoint_address,
                               frames[i], frame_size, adc_read_async_callback,
@@ -323,7 +331,7 @@ int adc_read_sync(adc_t *this, uint8_t *data, int length, int *transferred)
 
 
 /* internal functions */
-static void adc_read_async_callback(struct libusb_transfer *transfer)
+static void LIBUSB_CALL adc_read_async_callback(struct libusb_transfer *transfer)
 {
   adc_t *this = (adc_t *) transfer->user_data;
   int ret;
@@ -351,12 +359,13 @@ static void adc_read_async_callback(struct libusb_transfer *transfer)
       }
       break;
     case LIBUSB_TRANSFER_CANCELLED:
-      if (atomic_fetch_sub(&this->active_transfers, 1) == 1 && this->status ==
-          ADC_STATUS_CANCELLED) {
-        this->status = ADC_STATUS_READY;
-      }
+      /* librtlsdr does also ignore LIBUSB_TRANSFER_CANCELLED */
       return;
-    default:
+    case LIBUSB_TRANSFER_ERROR:
+    case LIBUSB_TRANSFER_TIMED_OUT:
+    case LIBUSB_TRANSFER_STALL:
+    case LIBUSB_TRANSFER_NO_DEVICE:
+    case LIBUSB_TRANSFER_OVERFLOW:
       log_usb_error(transfer->status, __func__, __FILE__, __LINE__);
       break;
   }
@@ -376,3 +385,4 @@ static void adc_read_async_callback(struct libusb_transfer *transfer)
   }
   return;
 }
+

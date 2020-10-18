@@ -44,7 +44,7 @@
 typedef struct usb_device usb_device_t;
 
 /* internal functions */
-static libusb_device_handle *find_usb_device(int index,
+static libusb_device_handle *find_usb_device(int index, libusb_context *ctx,
                              libusb_device **device, int *needs_firmware);
 static int load_image(libusb_device_handle *dev_handle,
                       const char *imagefile);
@@ -238,8 +238,9 @@ usb_device_t *usb_device_open(int index, const char* imagefile,
                               uint8_t gpio_register)
 {
   usb_device_t *ret_val = 0;
+  libusb_context *ctx = 0;
 
-  int ret = libusb_init(0);
+  int ret = libusb_init(&ctx);
   if (ret < 0) {
     log_usb_error(ret, __func__, __FILE__, __LINE__);
     goto FAIL0;
@@ -247,7 +248,7 @@ usb_device_t *usb_device_open(int index, const char* imagefile,
 
   libusb_device *device;
   int needs_firmware = 0;
-  libusb_device_handle *dev_handle = find_usb_device(index, &device, &needs_firmware);
+  libusb_device_handle *dev_handle = find_usb_device(index, ctx, &device, &needs_firmware);
   if (dev_handle == 0) {
     goto FAIL1;
   }
@@ -266,7 +267,7 @@ usb_device_t *usb_device_open(int index, const char* imagefile,
     usleep(500 * 1000L);
 
     needs_firmware = 0;
-    dev_handle = find_usb_device(index, &device, &needs_firmware);
+    dev_handle = find_usb_device(index, ctx, &device, &needs_firmware);
     if (dev_handle == 0) {
       goto FAIL1;
     }
@@ -274,6 +275,12 @@ usb_device_t *usb_device_open(int index, const char* imagefile,
       log_error("device is still in boot loader mode", __func__, __FILE__, __LINE__);
       goto FAIL2;
     }
+  }
+
+  int speed = libusb_get_device_speed(device);
+  if ( speed == LIBUSB_SPEED_LOW || speed == LIBUSB_SPEED_FULL || speed == LIBUSB_SPEED_HIGH ) {
+      log_error("USB 3.x SuperSpeed connection failed", __func__, __FILE__, __LINE__);
+      goto FAIL2;
   }
 
   /* list endpoints */
@@ -307,6 +314,8 @@ usb_device_t *usb_device_open(int index, const char* imagefile,
   usb_device_t *this = (usb_device_t *) malloc(sizeof(usb_device_t));
   this->dev = device;
   this->dev_handle = dev_handle;
+  this->context = ctx;
+  this->completed = 0;
   this->nendpoints = nendpoints;
   memset(this->endpoints, 0, sizeof(this->endpoints));
   for (int i = 0; i < nendpoints; ++i) {
@@ -338,6 +347,10 @@ void usb_device_close(usb_device_t *this)
   return;
 }
 
+int usb_device_handle_events(usb_device_t *this)
+{
+  return libusb_handle_events_completed(this->context, &this->completed);
+}
 
 int usb_device_control(usb_device_t *this, uint8_t request, uint16_t value,
                        uint16_t index, uint8_t *data, uint16_t length) {
@@ -440,7 +453,7 @@ int usb_device_i2c_read(usb_device_t *this, uint8_t i2c_address,
 
 
 /* internal functions */
-static libusb_device_handle *find_usb_device(int index,
+static libusb_device_handle *find_usb_device(int index, libusb_context *ctx,
                              libusb_device **device, int *needs_firmware)
 {
   libusb_device_handle *ret_val = 0;
@@ -449,7 +462,7 @@ static libusb_device_handle *find_usb_device(int index,
   *needs_firmware = 0;
 
   libusb_device **list = 0;
-  ssize_t nusbdevices = libusb_get_device_list(0, &list);
+  ssize_t nusbdevices = libusb_get_device_list(ctx, &list);
   if (nusbdevices < 0) {
     log_usb_error(nusbdevices, __func__, __FILE__, __LINE__);
     goto FAIL0;
