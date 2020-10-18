@@ -36,6 +36,11 @@ sudo cp misc/99-rf103.rules /etc/udev/rules.d/
 sudo udevadm control --reload-rules
 ```
 
+For some distributions (like Linux Mint), you may also need this command (thanks to Jon Fear for finding out):
+```
+sudo udevadm trigger
+```
+
 ## Copyright
 
 (C) 2020 Franco Venturi - Licensed under the GNU GPL V3 (see <LICENSE>)
