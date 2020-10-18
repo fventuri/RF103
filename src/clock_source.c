@@ -201,7 +201,7 @@ int clock_source_set_clock(clock_source_t *this, int index, double frequency)
 int clock_source_start_clock(clock_source_t *this, int index)
 {
   /* reset the PLL */
-  uint8_t pll_reset;
+  uint8_t pll_reset = 0;
   if (index == 0) {
     pll_reset = SI5351_VALUE_PLLA_RESET;
   } else if (index == 1) {

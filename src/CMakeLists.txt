@@ -6,6 +6,7 @@
 ### shared library
 add_library(rf103 SHARED
     librf103.c
+    ezusb.c
     logging.c
     usb_device.c
     clock_source.c

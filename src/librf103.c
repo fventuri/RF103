@@ -143,7 +143,8 @@ FAIL0:
 
 void rf103_close(rf103_t *this)
 {
-  adc_close(this->adc);
+  if (this->adc)
+    adc_close(this->adc);
   clock_source_close(this->clock_source);
   usb_device_close(this->usb_device);
   free(this);
@@ -246,9 +247,14 @@ int rf103_set_async_params(rf103_t *this, uint32_t frame_size,
                            uint32_t num_frames, rf103_read_async_cb_t callback,
                            void *callback_context)
 {
-  adc_t *adc = adc_open_async(this->usb_device, frame_size, num_frames,
+  if (this->adc) {
+    fprintf(stderr, "ERROR - adc_open_async() failed: already opened\n");
+    return -1;
+  }
+
+  this->adc = adc_open_async(this->usb_device, frame_size, num_frames,
                               callback, callback_context);
-  if (adc == 0) {
+  if (this->adc == 0) {
     fprintf(stderr, "ERROR - adc_open_async() failed\n");
     return -1;
   }

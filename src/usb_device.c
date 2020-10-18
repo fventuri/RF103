@@ -37,6 +37,7 @@
 
 #include "usb_device.h"
 #include "usb_device_internals.h"
+#include "ezusb.h"
 #include "logging.h"
 
 
@@ -134,8 +135,8 @@ int usb_device_get_device_list(struct usb_device_info **usb_device_infos)
 
   struct usb_device_info *device_infos = (struct usb_device_info *) malloc((nusbdevices + 1) * sizeof(struct usb_device_info));
   int count = 0;
-  for (ssize_t i = 0; i < nusbdevices; ++i) {
-    libusb_device *device = list[i];
+  for (ssize_t j = 0; j < nusbdevices; ++j) {
+    libusb_device *device = list[j];
     struct libusb_device_descriptor desc;
     ret = libusb_get_device_descriptor(device, &desc);
     for (int i = 0; i < n_usb_device_ids; ++i) {
@@ -253,13 +254,17 @@ usb_device_t *usb_device_open(int index, const char* imagefile,
 
   if (needs_firmware) {
     ret = load_image(dev_handle, imagefile);
-    if (ret < 0) {
+    if (ret != 0) {
       log_error("load_image() failed", __func__, __FILE__, __LINE__);
       goto FAIL2;
     }
 
     /* rescan USB to get a new device handle */
     libusb_close(dev_handle);
+
+    /* wait unitl firmware is ready */
+    usleep(500 * 1000L);
+
     needs_firmware = 0;
     dev_handle = find_usb_device(index, &device, &needs_firmware);
     if (dev_handle == 0) {
@@ -451,8 +456,8 @@ static libusb_device_handle *find_usb_device(int index,
   }
 
   int count = 0;
-  for (ssize_t i = 0; i < nusbdevices; ++i) {
-    libusb_device *dev = list[i];
+  for (ssize_t j = 0; j < nusbdevices; ++j) {
+    libusb_device *dev = list[j];
     struct libusb_device_descriptor desc;
     libusb_get_device_descriptor(dev, &desc);
     for (int i = 0; i < n_usb_device_ids; ++i) {
@@ -513,6 +518,13 @@ FAIL0:
 int load_image(libusb_device_handle *dev_handle, const char *imagefile)
 {
   int ret_val = -1;
+
+  const int fx_type = FX_TYPE_FX3;
+  const int img_type = IMG_TYPE_IMG;
+  const int stage = 0;
+  verbose = 1;
+  ret_val = ezusb_load_ram(dev_handle, imagefile, fx_type, img_type, stage);
+  return ret_val;
 
   int fd = open(imagefile, O_RDONLY);
   if (fd < 0) {
