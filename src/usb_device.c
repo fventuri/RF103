@@ -404,6 +404,14 @@ int usb_device_control(usb_device_t *this, uint8_t request, uint16_t value,
 }
 
 
+int usb_device_gpio_set(usb_device_t *this, uint8_t bit_pattern,
+                        uint8_t bit_mask) {
+  this->gpio_register = (this->gpio_register & ~bit_mask) | bit_pattern;
+  return usb_device_control(this, GPIOFX3, SI5351_ADDR, 0, &this->gpio_register,
+                            sizeof(this->gpio_register));
+}
+
+
 int usb_device_gpio_on(usb_device_t *this, uint8_t bit_pattern) {
   this->gpio_register |= bit_pattern;
   return usb_device_control(this, GPIOFX3, SI5351_ADDR, 0, &this->gpio_register,

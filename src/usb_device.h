@@ -64,6 +64,9 @@ void usb_device_close(usb_device_t *this);
 int usb_device_control(usb_device_t *this, uint8_t request, uint16_t value,
                        uint16_t index, uint8_t *data, uint16_t length);
 
+int usb_device_gpio_set(usb_device_t *this, uint8_t bit_pattern,
+                        uint8_t bit_mask);
+
 int usb_device_gpio_on(usb_device_t *this, uint8_t bit_pattern);
 
 int usb_device_gpio_off(usb_device_t *this, uint8_t bit_pattern);

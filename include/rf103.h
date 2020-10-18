@@ -76,6 +76,8 @@ int rf103_adc_dither(rf103_t *this, int dither);
 
 int rf103_adc_random(rf103_t *this, int dither);
 
+int rf103_hf_attenuation(rf103_t *this, double attenuation);
+
 
 /* streaming related functions */
 typedef void (*rf103_read_async_cb_t)(uint32_t data_size, uint8_t *data,

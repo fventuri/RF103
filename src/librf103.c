@@ -231,6 +231,28 @@ int rf103_adc_random(rf103_t *this, int random)
 }
 
 
+int rf103_hf_attenuation(rf103_t *this, double attenuation)
+{
+  uint8_t bit_pattern = 0;
+  switch ((int) attenuation) {
+    case 0:
+      bit_pattern = GPIO_SEL1;
+      break;
+    case 10:
+      bit_pattern = GPIO_SEL0 | GPIO_SEL1;
+      break;
+    case 20:
+      bit_pattern = GPIO_SEL0;
+      break;
+    default:
+      fprintf(stderr, "ERROR - invalid HF attenuation: %lf\n", attenuation);
+      return -1;
+  }
+  return usb_device_gpio_set(this->usb_device, bit_pattern,
+                             GPIO_SEL0 | GPIO_SEL1);
+}
+
+
 /******************************
  * streaming related functions
  ******************************/
