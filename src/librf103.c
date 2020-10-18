@@ -291,6 +291,10 @@ int rf103_start_streaming(rf103_t *this)
   return 0;
 }
 
+int rf103_handle_events(rf103_t *this)
+{
+  return usb_device_handle_events(this->usb_device);
+}
 
 int rf103_stop_streaming(rf103_t *this)
 {

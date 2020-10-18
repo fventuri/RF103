@@ -21,6 +21,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "rf103.h"
@@ -29,8 +30,15 @@
 static void count_bytes_callback(uint32_t data_size, uint8_t *data,
                                  void *context);
 static unsigned long long total_bytes;
-static unsigned long long num_callbacks;
+static int num_callbacks;
+static int runtime = 3000;
+static struct timespec clk_start, clk_end;
+static int stop_reception = 0;
 
+static double clk_diff() {
+  return ((double)clk_end.tv_sec + 1.0e-9*clk_end.tv_nsec) - 
+           ((double)clk_start.tv_sec + 1.0e-9*clk_start.tv_nsec);
+}
 
 
 int main(int argc, char **argv)
@@ -41,7 +49,6 @@ int main(int argc, char **argv)
   }
   char *imagefile = argv[1];
   double sample_rate = 0.0;
-  int runtime = 1000;
   sscanf(argv[2], "%lf", &sample_rate);
   if (3 < argc)
     runtime = atoi(argv[3]);
@@ -64,7 +71,7 @@ int main(int argc, char **argv)
     goto DONE;
   }
 
-  if (rf103_set_async_params(rf103, 0, 0, count_bytes_callback, 0) < 0) {
+  if (rf103_set_async_params(rf103, 0, 0, count_bytes_callback, rf103) < 0) {
     fprintf(stderr, "ERROR - rf103_set_async_params() failed\n");
     goto DONE;
   }
@@ -77,15 +84,23 @@ int main(int argc, char **argv)
   }
 
   fprintf(stderr, "started streaming .. for %d ms ..\n", runtime);
-  usleep(runtime * 1000L);
 
+  /* todo: move this into a thread */
+  stop_reception = 0;
+  clock_gettime(CLOCK_REALTIME, &clk_start);
+  while (!stop_reception)
+    rf103_handle_events(rf103);
+
+  fprintf(stderr, "finished. now stop streaming ..\n");
   if (rf103_stop_streaming(rf103) < 0) {
     fprintf(stderr, "ERROR - rf103_stop_streaming() failed\n");
     return -1;
   }
 
-  fprintf(stderr, "total bytes received=%llu in %llu callbacks\n", total_bytes, num_callbacks);
-  fprintf(stderr, "approx. samplerate is %llu kSamples/sec\n", total_bytes / (2*runtime) );
+  double dur = clk_diff();
+  fprintf(stderr, "total bytes received=%llu in %d callbacks\n", total_bytes, num_callbacks);
+  fprintf(stderr, "run for %f sec\n", dur);
+  fprintf(stderr, "approx. samplerate is %f kSamples/sec\n", total_bytes / (2000.0*dur) );
 
   /* done - all good */
   ret_val = 0;
@@ -98,8 +113,15 @@ DONE:
 
 static void count_bytes_callback(uint32_t data_size,
                                  uint8_t *data __attribute__((unused)),
-                                 void *context __attribute__((unused)))
+                                 void *context __attribute__((unused)) )
 {
-    ++num_callbacks;
-    total_bytes += data_size;
+  if (stop_reception)
+    return;
+  ++num_callbacks;
+  total_bytes += data_size;
+  if ( num_callbacks >= runtime ) {
+    clock_gettime(CLOCK_REALTIME, &clk_end);
+    stop_reception = 1;
+  }
 }
+

@@ -57,6 +57,8 @@ int usb_device_free_device_list(struct usb_device_info *usb_device_infos);
 usb_device_t *usb_device_open(int index, const char* imagefile,
                               uint8_t gpio_register);
 
+int usb_device_handle_events(usb_device_t *this);
+
 void usb_device_close(usb_device_t *this);
 
 int usb_device_control(usb_device_t *this, uint8_t request, uint16_t value,

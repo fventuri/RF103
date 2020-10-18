@@ -89,6 +89,8 @@ int rf103_set_async_params(rf103_t *this, uint32_t frame_size,
 
 int rf103_start_streaming(rf103_t *this);
 
+int rf103_handle_events(rf103_t *this);
+
 int rf103_stop_streaming(rf103_t *this);
 
 int rf103_reset_status(rf103_t *this);
