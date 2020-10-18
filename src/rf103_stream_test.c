@@ -21,17 +21,21 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <unistd.h>
 
 #include "rf103.h"
+#include "wavewrite.h"
 
 
 static void count_bytes_callback(uint32_t data_size, uint8_t *data,
                                  void *context);
-static unsigned long long received_bytes;
-static unsigned long long total_bytes;
+
+static unsigned long long received_samples = 0;
+static unsigned long long total_samples = 0;
 static int num_callbacks;
+static int16_t *sampleData = 0;
 static int runtime = 3000;
 static struct timespec clk_start, clk_end;
 static int stop_reception = 0;
@@ -45,14 +49,17 @@ static double clk_diff() {
 int main(int argc, char **argv)
 {
   if (argc < 3) {
-    fprintf(stderr, "usage: %s <image file> <sample rate> [<runtime_in_ms>]\n", argv[0]);
+    fprintf(stderr, "usage: %s <image file> <sample rate> [<runtime_in_ms> [<output_filename>]\n", argv[0]);
     return -1;
   }
   char *imagefile = argv[1];
+  const char *outfilename = 0;
   double sample_rate = 0.0;
   sscanf(argv[2], "%lf", &sample_rate);
   if (3 < argc)
     runtime = atoi(argv[3]);
+  if (4 < argc)
+    outfilename = argv[4];
 
   if (sample_rate <= 0) {
     fprintf(stderr, "ERROR - given samplerate '%f' should be > 0\n", sample_rate);
@@ -77,7 +84,7 @@ int main(int argc, char **argv)
     goto DONE;
   }
 
-  received_bytes = 0;
+  received_samples = 0;
   num_callbacks = 0;
   if (rf103_start_streaming(rf103) < 0) {
     fprintf(stderr, "ERROR - rf103_start_streaming() failed\n");
@@ -85,7 +92,10 @@ int main(int argc, char **argv)
   }
 
   fprintf(stderr, "started streaming .. for %d ms ..\n", runtime);
-  total_bytes = (unsigned long long)(runtime * 2.0 * sample_rate / 1000.0);
+  total_samples = (unsigned long long)(runtime * sample_rate / 1000.0);
+
+  if (outfilename)
+    sampleData = (int16_t*)malloc(total_samples * sizeof(int16_t));
 
   /* todo: move this into a thread */
   stop_reception = 0;
@@ -100,9 +110,21 @@ int main(int argc, char **argv)
   }
 
   double dur = clk_diff();
-  fprintf(stderr, "total bytes received=%llu in %d callbacks\n", received_bytes, num_callbacks);
+  fprintf(stderr, "received=%llu 16-Bit samples in %d callbacks\n", received_samples, num_callbacks);
   fprintf(stderr, "run for %f sec\n", dur);
-  fprintf(stderr, "approx. samplerate is %f kSamples/sec\n", received_bytes / (2000.0*dur) );
+  fprintf(stderr, "approx. samplerate is %f kSamples/sec\n", received_samples / (1000.0*dur) );
+
+  if (outfilename && sampleData && received_samples) {
+    FILE * f = fopen(outfilename, "wb");
+    if (f) {
+      fprintf(stderr, "saving received real samples to file ..\n");
+      waveWriteHeader( (unsigned)(0.5 + sample_rate), 0U /*frequency*/, 16 /*bitsPerSample*/, 1 /*numChannels*/, f);
+      for ( unsigned long long off = 0; off + 65536 < received_samples; off += 65536 )
+        waveWriteSamples(f,  sampleData + off, 65536, 0 /*needCleanData*/);
+      waveFinalizeHeader(f);
+      fclose(f);
+    }
+  }
 
   /* done - all good */
   ret_val = 0;
@@ -114,14 +136,19 @@ DONE:
 }
 
 static void count_bytes_callback(uint32_t data_size,
-                                 uint8_t *data __attribute__((unused)),
+                                 uint8_t *data,
                                  void *context __attribute__((unused)) )
 {
   if (stop_reception)
     return;
   ++num_callbacks;
-  received_bytes += data_size;
-  if ( received_bytes >= total_bytes ) {
+  unsigned N = data_size / sizeof(int16_t);
+  if ( received_samples + N < total_samples ) {
+    if (sampleData)
+      memcpy( sampleData+received_samples, data, data_size);
+    received_samples += N;
+  }
+  else {
     clock_gettime(CLOCK_REALTIME, &clk_end);
     stop_reception = 1;
   }
