@@ -29,6 +29,7 @@
 
 static void count_bytes_callback(uint32_t data_size, uint8_t *data,
                                  void *context);
+static unsigned long long received_bytes;
 static unsigned long long total_bytes;
 static int num_callbacks;
 static int runtime = 3000;
@@ -76,7 +77,7 @@ int main(int argc, char **argv)
     goto DONE;
   }
 
-  total_bytes = 0;
+  received_bytes = 0;
   num_callbacks = 0;
   if (rf103_start_streaming(rf103) < 0) {
     fprintf(stderr, "ERROR - rf103_start_streaming() failed\n");
@@ -84,6 +85,7 @@ int main(int argc, char **argv)
   }
 
   fprintf(stderr, "started streaming .. for %d ms ..\n", runtime);
+  total_bytes = (unsigned long long)(runtime * 2.0 * sample_rate / 1000.0);
 
   /* todo: move this into a thread */
   stop_reception = 0;
@@ -98,9 +100,9 @@ int main(int argc, char **argv)
   }
 
   double dur = clk_diff();
-  fprintf(stderr, "total bytes received=%llu in %d callbacks\n", total_bytes, num_callbacks);
+  fprintf(stderr, "total bytes received=%llu in %d callbacks\n", received_bytes, num_callbacks);
   fprintf(stderr, "run for %f sec\n", dur);
-  fprintf(stderr, "approx. samplerate is %f kSamples/sec\n", total_bytes / (2000.0*dur) );
+  fprintf(stderr, "approx. samplerate is %f kSamples/sec\n", received_bytes / (2000.0*dur) );
 
   /* done - all good */
   ret_val = 0;
@@ -118,8 +120,8 @@ static void count_bytes_callback(uint32_t data_size,
   if (stop_reception)
     return;
   ++num_callbacks;
-  total_bytes += data_size;
-  if ( num_callbacks >= runtime ) {
+  received_bytes += data_size;
+  if ( received_bytes >= total_bytes ) {
     clock_gettime(CLOCK_REALTIME, &clk_end);
     stop_reception = 1;
   }
