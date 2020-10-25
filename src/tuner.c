@@ -304,6 +304,14 @@ printf("this: %p\n", (void *) this);
 }
 
 
+int tuner_stop(tuner_t *this)
+{
+  /* TODO */
+printf("this: %p\n", (void *) this);
+  return 0;
+}
+
+
 /* internal functions */
 
 static int tuner_init_registers(tuner_t *this)

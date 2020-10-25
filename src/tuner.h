@@ -52,6 +52,8 @@ int tuner_set_harmonic_frequency(tuner_t *this, double frequency, int harmonic);
 
 int tuner_start(tuner_t *this);
 
+int tuner_stop(tuner_t *this);
+
 #ifdef __cplusplus
 }
 #endif
