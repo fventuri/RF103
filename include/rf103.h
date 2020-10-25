@@ -44,6 +44,13 @@ enum RF103Status {
   STATUS_FAILED = 0xff
 };
 
+enum RFMode {
+  NO_RF_MODE,
+  VLF_MODE,
+  HF_MODE,
+  VHF_MODE
+};
+
 enum LEDColors {
   LED_RED    = 0x01,
   LED_YELLOW = 0x02,
@@ -63,6 +70,8 @@ rf103_t *rf103_open(int index, const char* imagefile);
 void rf103_close(rf103_t *this);
 
 enum RF103Status rf103_status(rf103_t *this);
+
+int rf103_set_rf_mode(rf103_t *this, enum RFMode rf_mode);
 
 
 /* GPIO related functions */

@@ -11,6 +11,7 @@ add_library(rf103 SHARED
     usb_device.c
     clock_source.c
     adc.c
+    tuner.c
 )
 set_target_properties(rf103 PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(rf103 PROPERTIES SOVERSION 0)

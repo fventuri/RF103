@@ -29,6 +29,7 @@
 #include "usb_device.h"
 #include "clock_source.h"
 #include "adc.h"
+#include "tuner.h"
 
 typedef struct rf103 rf103_t;
 
@@ -36,19 +37,14 @@ typedef struct rf103 rf103_t;
 static uint8_t initial_gpio_register();
 
 
-enum RFMode {
-  NO_RF_MODE,
-  VLF_MODE,
-  HF_MODE,
-  VHF_MODE
-};
-
-
 typedef struct rf103 {
   enum RF103Status status;
+  enum RFMode rf_mode;
   usb_device_t *usb_device;
   clock_source_t *clock_source;
   adc_t *adc;
+  int has_tuner;
+  tuner_t *tuner;
   double sample_rate;
 } rf103_t;
 
@@ -126,9 +122,12 @@ rf103_t *rf103_open(int index, const char* imagefile)
 
   rf103_t *this = (rf103_t *) malloc(sizeof(rf103_t));
   this->status = STATUS_READY;
+  this->rf_mode = HF_MODE;
   this->usb_device = usb_device;
   this->clock_source = clock_source;
   this->adc = 0;
+  this->has_tuner = has_tuner(usb_device);
+  this->tuner = 0;
   this->sample_rate = 0;    /* default sample rate */
 
   ret_val = this;
@@ -145,6 +144,8 @@ void rf103_close(rf103_t *this)
 {
   if (this->adc)
     adc_close(this->adc);
+  if (this->tuner)
+    tuner_close(this->tuner);
   clock_source_close(this->clock_source);
   usb_device_close(this->usb_device);
   free(this);
@@ -155,6 +156,33 @@ void rf103_close(rf103_t *this)
 enum RF103Status rf103_status(rf103_t *this)
 {
   return this->status;
+}
+
+
+int rf103_set_rf_mode(rf103_t *this, enum RFMode rf_mode)
+{
+  switch (rf_mode) {
+    case HF_MODE:
+      if (this->tuner)
+        tuner_close(this->tuner);
+      this->tuner = 0;
+      break;
+    case VHF_MODE:
+      if (!this->has_tuner) {
+        fprintf(stderr, "WARNING - no VHF/UHF tuner found\n");
+        return -1;
+      }
+      this->tuner = tuner_open(this->usb_device);
+      if (this->tuner == 0) {
+        fprintf(stderr, "ERROR - tuner_open() failed\n");
+        return -1;
+      }
+      break;
+    default:
+      fprintf(stderr, "WARNING - invalid RF mode: %d\n", rf_mode);
+      return -1;
+  }
+  return 0;
 }
 
 
@@ -296,6 +324,24 @@ int rf103_start_streaming(rf103_t *this)
   if (ret < 0) {
     fprintf(stderr, "ERROR - clock_source_start_clock() failed\n");
     return -1;
+  }
+  if (this->rf_mode == VHF_MODE && this->tuner) {
+    ret = clock_source_set_clock(this->clock_source, TUNER_CLOCK,
+                                 tuner_get_xtal_frequency(this->tuner));
+    if (ret < 0) {
+      fprintf(stderr, "ERROR - clock_source_set_clock() failed\n");
+      return -1;
+    }
+    ret = clock_source_start_clock(this->clock_source, TUNER_CLOCK);
+    if (ret < 0) {
+      fprintf(stderr, "ERROR - clock_source_start_clock() failed\n");
+      return -1;
+    }
+    ret = tuner_start(this->tuner);
+    if (ret < 0) {
+      fprintf(stderr, "ERROR - tuner_start() failed\n");
+      return -1;
+    }
   }
   adc_set_sample_rate(this->adc, (uint32_t) this->sample_rate);
   ret = adc_start(this->adc);
