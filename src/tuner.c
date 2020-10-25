@@ -43,7 +43,6 @@
 
 
 #include <errno.h>
-#include <math.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -92,12 +91,14 @@ enum { R820T2_REGISTERS = 32 };
 typedef struct tuner {
   usb_device_t *usb_device;
   uint32_t xtal_frequency;
+  uint32_t if_frequency;
   uint8_t registers[R820T2_REGISTERS];
   uint32_t registers_dirty_mask;
 } tuner_t;
 
 
 static const uint32_t DEFAULT_TUNER_XTAL_FREQUENCY = 32000000;
+static const uint32_t DEFAULT_TUNER_IF_FREQUENCY = 7000000;
 
 static const uint8_t R820T2_ADDR = 0x1a;
 static const uint8_t R820T2_ADDR_READ  = R820T2_ADDR << 1 | 0x00;
@@ -195,6 +196,7 @@ tuner_t *tuner_open(usb_device_t *usb_device)
   tuner_t *this = (tuner_t *) malloc(sizeof(tuner_t));
   this->usb_device = usb_device;
   this->xtal_frequency = DEFAULT_TUNER_XTAL_FREQUENCY;
+  this->if_frequency = DEFAULT_TUNER_IF_FREQUENCY;
   memset(this->registers, 0, sizeof(this->registers));
   this->registers_dirty_mask = 0;
 
@@ -234,6 +236,62 @@ int tuner_set_xtal_frequency(tuner_t *this, uint32_t xtal_frequency)
 {
   /* no checks yet */
   this->xtal_frequency = xtal_frequency;
+  return 0;
+}
+
+
+uint32_t tuner_get_if_frequency(tuner_t *this)
+{
+  return this->if_frequency;
+}
+
+
+int tuner_set_if_frequency(tuner_t *this, uint32_t if_frequency)
+{
+  /* no checks yet */
+  this->if_frequency = if_frequency;
+  return 0;
+}
+
+
+int tuner_set_frequency(tuner_t *this, double frequency)
+{
+  int ret = tuner_set_mux(this, frequency);
+  if (ret < 0) {
+    fprintf(stderr, "ERROR - tuner_set_mux() failed\n");
+    return -1;
+  }
+
+  double lo_frequency = frequency + this->if_frequency;
+  ret = tuner_set_pll(this, lo_frequency);
+  if (ret < 0) {
+    fprintf(stderr, "ERROR - tuner_set_pll() failed\n");
+    return -1;
+  }
+  return 0;
+}
+
+
+int tuner_set_harmonic_frequency(tuner_t *this, double frequency,
+                                 int harmonic)
+{
+  if (harmonic < 0 || harmonic % 2 == 0) {
+    fprintf(stderr, "ERROR - tuner_set_harmonic_frequency() failed: invalid hardmonic %d\n", harmonic);
+    return -1;
+  }
+
+  int ret = tuner_set_mux(this, frequency);
+  if (ret < 0) {
+    fprintf(stderr, "ERROR - tuner_set_mux() failed\n");
+    return -1;
+  }
+
+  double lo_frequency = (frequency + this->if_frequency) / harmonic;
+  ret = tuner_set_pll(this, lo_frequency);
+  if (ret < 0) {
+    fprintf(stderr, "ERROR - tuner_set_pll() failed\n");
+    return -1;
+  }
   return 0;
 }
 
@@ -401,7 +459,7 @@ static int tuner_compute_pll_parameters(tuner_t *this, double frequency,
     fprintf(stderr, "requested PLL frequency is too high: %lg\n", frequency);
     return -1;
   }
-  uint32_t mult_scaled = (uint32_t) round(multiplier * SDM_FRAC_PRECISION);
+  uint32_t mult_scaled = (uint32_t) (multiplier * SDM_FRAC_PRECISION + 0.5);
   uint32_t mult_int = mult_scaled / SDM_FRAC_PRECISION;
   uint32_t mult_frac = mult_scaled % SDM_FRAC_PRECISION;
 
@@ -672,6 +730,7 @@ static int tuner_write_value(tuner_t *this, const uint8_t where[3],
     return -1;
   }
   this->registers_dirty_mask &= ~(1 << reg);
+  return 0;
 }
 
 

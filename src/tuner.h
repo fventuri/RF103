@@ -42,6 +42,14 @@ uint32_t tuner_get_xtal_frequency(tuner_t *this);
 
 int tuner_set_xtal_frequency(tuner_t *this, uint32_t xtal_frequency);
 
+uint32_t tuner_get_if_frequency(tuner_t *this);
+
+int tuner_set_if_frequency(tuner_t *this, uint32_t if_frequency);
+
+int tuner_set_frequency(tuner_t *this, double frequency);
+
+int tuner_set_harmonic_frequency(tuner_t *this, double frequency, int harmonic);
+
 int tuner_start(tuner_t *this);
 
 #ifdef __cplusplus
