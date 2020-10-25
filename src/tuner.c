@@ -61,13 +61,20 @@ typedef struct tuner tuner_t;
 
 /* internal functions */
 struct tuner_pll_parameters;
+struct tuner_mux_parameters;
 
 static int tuner_init_registers(tuner_t *this);
 static int tuner_set_pll(tuner_t *this, double frequency) __attribute__((unused));
-static int tuner_compute_pll_paramaters(tuner_t *this, double frequency,
+static int tuner_compute_pll_parameters(tuner_t *this, double frequency,
                                         struct tuner_pll_parameters *pll_params);
-static int tuner_apply_pll_paramaters(tuner_t *this,
+static int tuner_apply_pll_parameters(tuner_t *this,
                                       const struct tuner_pll_parameters *pll_params);
+static int tuner_set_mux(tuner_t *this, double frequency) __attribute__((unused));
+static int tuner_compute_mux_parameters(tuner_t *this,
+                                        double frequency,
+                                        struct tuner_mux_parameters *mux_params);
+static int tuner_apply_mux_parameters(tuner_t *this,
+                                      const struct tuner_mux_parameters *mux_params);
 
 static int tuner_read_value(tuner_t *this, const uint8_t where[3],
                             uint8_t *value);
@@ -141,6 +148,7 @@ static const uint8_t R820T2_CLK_OUT_ENB[]   = { 0x0f, 0x10, 4 };
 static const uint8_t R820T2_CLK_AGC_ENB[]   = { 0x0f, 0x02, 1 };
 static const uint8_t R820T2_SEL_DIV[]       = { 0x10, 0xe0, 5 };
 static const uint8_t R820T2_REFDIV[]        = { 0x10, 0x10, 4 };
+static const uint8_t R820T2_XTAL_DRIVE[]    = { 0x10, 0x08, 3 };
 static const uint8_t R820T2_CAPX[]          = { 0x10, 0x03, 0 };
 static const uint8_t R820T2_PW_LDO_A[]      = { 0x11, 0xc0, 6 };
 static const uint8_t R820T2_VCO_CURRENT[]   = { 0x12, 0xe0, 5 };
@@ -330,22 +338,22 @@ struct tuner_pll_parameters {
 static int tuner_set_pll(tuner_t *this, double frequency)
 {
   struct tuner_pll_parameters pll_params;
-  int ret = tuner_compute_pll_paramaters(this, frequency, &pll_params);
+  int ret = tuner_compute_pll_parameters(this, frequency, &pll_params);
   if (ret < 0) {
-    fprintf(stderr, "ERROR - tuner_compute_pll_paramaters() failed\n");
+    fprintf(stderr, "ERROR - tuner_compute_pll_parameters() failed\n");
     return -1;
   }
 
-  ret = tuner_apply_pll_paramaters(this, &pll_params);
+  ret = tuner_apply_pll_parameters(this, &pll_params);
   if (ret < 0) {
-    fprintf(stderr, "ERROR - tuner_apply_pll_paramaters() failed\n");
+    fprintf(stderr, "ERROR - tuner_apply_pll_parameters() failed\n");
     return -1;
   }
   return 0;
 }
 
 
-static int tuner_compute_pll_paramaters(tuner_t *this, double frequency,
+static int tuner_compute_pll_parameters(tuner_t *this, double frequency,
                                         struct tuner_pll_parameters *pll_params)
 {
   /* useful constants */
@@ -424,7 +432,7 @@ static int tuner_compute_pll_paramaters(tuner_t *this, double frequency,
 }
 
 
-static int tuner_apply_pll_paramaters(tuner_t *this,
+static int tuner_apply_pll_parameters(tuner_t *this,
                                       const struct tuner_pll_parameters *pll_params)
 {
   /* set PLL autotune = 128kHz */
@@ -492,6 +500,119 @@ static int tuner_apply_pll_paramaters(tuner_t *this,
     return -1;
   }
 
+  return 0;
+}
+
+
+struct tuner_mux_parameters {
+  uint8_t open_d;       /* Open Drain */
+  uint8_t rf_mux_ploy;  /* RF_MUX, Polymux */
+  uint8_t tf_c;         /* Tracking Filter Band */
+};
+
+
+static int tuner_set_mux(tuner_t *this, double frequency)
+{
+  struct tuner_mux_parameters mux_params;
+  int ret = tuner_compute_mux_parameters(this, frequency, &mux_params);
+  if (ret < 0) {
+    fprintf(stderr, "ERROR - tuner_compute_mux_parameters() failed\n");
+    return -1;
+  }
+
+  ret = tuner_apply_mux_parameters(this, &mux_params);
+  if (ret < 0) {
+    fprintf(stderr, "ERROR - tuner_apply_mux_parameters() failed\n");
+    return -1;
+  }
+  return 0;
+}
+
+
+static int tuner_compute_mux_parameters(tuner_t *this __attribute__((unused)),
+                                        double frequency,
+                                        struct tuner_mux_parameters *mux_params)
+{
+  /* based on Mauro Carvalho Chehab freq_ranges table
+   * https://github.com/torvalds/linux/blob/master/drivers/media/tuners/r820t.c
+   * Copyright (C) 2013 Mauro Carvalho Chehab
+   */
+  const struct {
+    double lower_frequency;
+    struct tuner_mux_parameters mux_parameters;
+  } mux_params_table[] = {
+  /*
+   * freq                            open_d  rf_mux_ploy     tf_c
+   */
+  {   0.0, { 0x08, 0x02, 0xdf } },  /*  low,  (LPF, low),  (band2, band0) */
+  {  50e6, { 0x08, 0x02, 0xbe } },  /*  low,  (LPF, low),  (band4, band1) */
+  {  55e6, { 0x08, 0x02, 0x8b } },  /*  low,  (LPF, low),  (band7, band4) */
+  {  60e6, { 0x08, 0x02, 0x7b } },  /*  low,  (LPF, low),  (band8, band4) */
+  {  65e6, { 0x08, 0x02, 0x69 } },  /*  low,  (LPF, low),  (band9, band6) */
+  {  70e6, { 0x08, 0x02, 0x58 } },  /*  low,  (LPF, low),  (band10, band7) */
+  {  75e6, { 0x00, 0x02, 0x44 } },  /* high,  (LPF, low),  (band11, band11) */
+  {  80e6, { 0x00, 0x02, 0x44 } },  /* high,  (LPF, low),  (band11, band11) */
+  {  90e6, { 0x00, 0x02, 0x34 } },  /* high,  (LPF, low),  (band12, band11) */
+  { 100e6, { 0x00, 0x02, 0x34 } },  /* high,  (LPF, low),  (band12, band11) */
+  { 110e6, { 0x00, 0x02, 0x24 } },  /* high,  (LPF, low),  (band13, band11) */
+  { 120e6, { 0x00, 0x02, 0x24 } },  /* high,  (LPF, low),  (band13, band11) */
+  { 140e6, { 0x00, 0x02, 0x14 } },  /* high,  (LPF, low),  (band14, band11) */
+  { 180e6, { 0x00, 0x02, 0x13 } },  /* high,  (LPF, low),  (band14, band12) */
+  { 220e6, { 0x00, 0x02, 0x13 } },  /* high,  (LPF, low),  (band14, band12) */
+  { 250e6, { 0x00, 0x02, 0x11 } },  /* high,  (LPF, low),  (highest, highest) */
+  { 280e6, { 0x00, 0x02, 0x00 } },  /* high,  (LPF, low),  (highest, highest) */
+  { 310e6, { 0x00, 0x41, 0x00 } },  /* high,  (bypass, mid),  (highest, highest) */
+  { 450e6, { 0x00, 0x41, 0x00 } },  /* high,  (bypass, mid),  (highest, highest) */
+  { 588e6, { 0x00, 0x40, 0x00 } },  /* high,  (bypass, highest),  (highest, highest) */
+  { 650e6, { 0x00, 0x40, 0x00 } }   /* high,  (bypass, highest),  (highest, highest) */
+  };
+
+  memset(mux_params, 0, sizeof(*mux_params));
+
+  int mux_params_table_size = sizeof(mux_params_table) / sizeof(mux_params_table);
+  int idx;
+  for (idx = 0; idx < mux_params_table_size - 1; ++idx) {
+    if (frequency < mux_params_table[idx+1].lower_frequency) {
+      break;
+    }
+  }
+  mux_params->open_d = mux_params_table[idx].mux_parameters.open_d;
+  mux_params->rf_mux_ploy = mux_params_table[idx].mux_parameters.rf_mux_ploy;
+  mux_params->tf_c = mux_params_table[idx].mux_parameters.tf_c;
+
+  /* all good */
+  return 0;
+}
+
+
+static int tuner_apply_mux_parameters(tuner_t *this,
+                                      const struct tuner_mux_parameters *mux_params)
+{
+  /* set MUX parameters */
+  tuner_set_value(this, R820T2_OPEN_D, mux_params->open_d >> 3);
+  tuner_set_value(this, R820T2_RFMUX, (mux_params->rf_mux_ploy & 0xc0) >> 6);
+  tuner_set_value(this, R820T2_RFFILT, (mux_params->rf_mux_ploy & 0x03) >> 0);
+  tuner_set_value(this, R820T2_TF_NCH, (mux_params->tf_c & 0xf0) >> 4);
+  tuner_set_value(this, R820T2_TF_LP, (mux_params->tf_c & 0x0f) >> 0);
+
+  /* XTAL CAP & Drive */
+  /* Internal xtal no cap,  bit3 = 0 ? */
+  tuner_set_value(this, R820T2_XTAL_DRIVE, 0);
+  tuner_set_value(this, R820T2_CAPX, 0);
+  /* Mixer buffer power on, high current, Image Gain Adjustment min */
+  tuner_set_value(this, R820T2_PWD_AMP, 1);
+  tuner_set_value(this, R820T2_PW0_AMP, 0);
+  tuner_set_value(this, R820T2_IMR_G, 0);
+  /* IF Filter power on, high current, Image Gain Adjustment min */
+  tuner_set_value(this, R820T2_PWD_IFFILT, 0);
+  tuner_set_value(this, R820T2_PW1_IFFILT, 0);
+  tuner_set_value(this, R820T2_IMR_P, 0);
+
+  int ret = tuner_write_registers(this, this->registers_dirty_mask);
+  if (ret < 0) {
+    log_error("tuner_write_registers() failed", __func__, __FILE__, __LINE__);
+    return -1;
+  }
   return 0;
 }
 
