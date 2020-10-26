@@ -50,9 +50,31 @@ int tuner_set_frequency(tuner_t *this, double frequency);
 
 int tuner_set_harmonic_frequency(tuner_t *this, double frequency, int harmonic);
 
+int tuner_get_lna_gains(tuner_t *this, const int *gains[]);
+
+int tuner_set_lna_gain(tuner_t *this, int gain);
+
+int tuner_set_lna_agc(tuner_t *this, int agc);
+
+int tuner_get_mixer_gains(tuner_t *this, const int *gains[]);
+
+int tuner_set_mixer_gain(tuner_t *this, int gain);
+
+int tuner_set_mixer_agc(tuner_t *this, int agc);
+
+int tuner_get_vga_gains(tuner_t *this, const int *gains[]);
+
+int tuner_set_vga_gain(tuner_t *this, int gain);
+
+int tuner_get_if_bandwidths(tuner_t *this, uint32_t *if_bandwidths[]);
+
+int tuner_set_if_bandwidth(tuner_t *this, uint32_t bandwidth);
+
 int tuner_start(tuner_t *this);
 
 int tuner_stop(tuner_t *this);
+
+int tuner_standby(tuner_t *this);
 
 #ifdef __cplusplus
 }

@@ -136,7 +136,7 @@ static const uint8_t R820T2_IMR_P[]         = { 0x09, 0x3f, 0 };
 static const uint8_t R820T2_PWD_FILT[]      = { 0x0a, 0x80, 7 };
 static const uint8_t R820T2_PW_FILT[]       = { 0x0a, 0x60, 5 };
 static const uint8_t R820T2_FILT_CODE[]     = { 0x0a, 0x0f, 0 };
-static const uint8_t R820T2_FILT_BW[]       = { 0x0b, 0x60, 5 };
+static const uint8_t R820T2_FILT_BW[]       = { 0x0b, 0xe0, 5 };
 static const uint8_t R820T2_HPF[]           = { 0x0b, 0x0f, 0 };
 static const uint8_t R820T2_PWD_VGA[]       = { 0x0c, 0x40, 6 };
 static const uint8_t R820T2_VGA_MODE[]      = { 0x0c, 0x10, 4 };
@@ -296,6 +296,205 @@ int tuner_set_harmonic_frequency(tuner_t *this, double frequency,
 }
 
 
+/* LNA gain */
+static const int tuner_lna_gains_table[] = {
+  0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30
+};
+
+int tuner_get_lna_gains(tuner_t *this __attribute__((unused)),
+                        const int *gains[])
+{
+  *gains = tuner_lna_gains_table;
+  return sizeof(tuner_lna_gains_table) / sizeof(tuner_lna_gains_table[0]);
+}
+
+int tuner_set_lna_gain(tuner_t *this, int gain)
+{
+  int lna_gains_table_size = sizeof(tuner_lna_gains_table) /
+                             sizeof(tuner_lna_gains_table[0]);
+  int idx;
+  for (idx = 0; idx < lna_gains_table_size; ++idx) {
+    if (gain == tuner_lna_gains_table[idx]) {
+      break;
+    }
+  }
+  if (idx == lna_gains_table_size) {
+    fprintf(stderr, "ERROR - tuner_set_lna_gain(): invalid LNA gain %d\n",
+            gain);
+    return -1;
+  }
+  int ret = tuner_write_value(this, R820T2_LNA_GAIN, (uint8_t) idx);
+  if (ret < 0) {
+    log_error("tuner_write_value() failed", __func__, __FILE__, __LINE__);
+    return -1;
+  }
+  return 0;
+}
+
+int tuner_set_lna_agc(tuner_t *this, int agc)
+{
+  int ret = tuner_write_value(this, R820T2_LNA_GAIN_MODE, agc ? 0 : 1);
+  if (ret < 0) {
+    log_error("tuner_write_value() failed", __func__, __FILE__, __LINE__);
+    return -1;
+  }
+  return 0;
+}
+
+
+/* Mixer gain */
+static const int tuner_mixer_gains_table[] = {
+  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
+};
+
+int tuner_get_mixer_gains(tuner_t *this __attribute__((unused)),
+                          const int *gains[])
+{
+  *gains = tuner_mixer_gains_table;
+  return sizeof(tuner_mixer_gains_table) / sizeof(tuner_mixer_gains_table[0]);
+}
+
+int tuner_set_mixer_gain(tuner_t *this, int gain)
+{
+  int mixer_gains_table_size = sizeof(tuner_mixer_gains_table) /
+                               sizeof(tuner_mixer_gains_table[0]);
+  int idx;
+  for (idx = 0; idx < mixer_gains_table_size; ++idx) {
+    if (gain == tuner_mixer_gains_table[idx]) {
+      break;
+    }
+  }
+  if (idx == mixer_gains_table_size) {
+    fprintf(stderr, "ERROR - tuner_set_mixer_gain(): invalid mixer gain %d\n",
+            gain);
+    return -1;
+  }
+  int ret = tuner_write_value(this, R820T2_MIX_GAIN, (uint8_t) idx);
+  if (ret < 0) {
+    log_error("tuner_write_value() failed", __func__, __FILE__, __LINE__);
+    return -1;
+  }
+  return 0;
+}
+
+int tuner_set_mixer_agc(tuner_t *this, int agc)
+{
+  int ret = tuner_write_value(this, R820T2_MIXGAIN_MODE, agc ? 1 : 0);
+  if (ret < 0) {
+    log_error("tuner_write_value() failed", __func__, __FILE__, __LINE__);
+    return -1;
+  }
+  return 0;
+}
+
+
+/* VGA gain */
+static const int tuner_vga_gains_table[] = {
+  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
+};
+
+int tuner_get_vga_gains(tuner_t *this __attribute__((unused)),
+                        const int *gains[])
+{
+  *gains = tuner_vga_gains_table;
+  return sizeof(tuner_vga_gains_table) / sizeof(tuner_vga_gains_table[0]);
+}
+
+int tuner_set_vga_gain(tuner_t *this, int gain)
+{
+  int vga_gains_table_size = sizeof(tuner_vga_gains_table) /
+                             sizeof(tuner_vga_gains_table[0]);
+  int idx;
+  for (idx = 0; idx < vga_gains_table_size; ++idx) {
+    if (gain == tuner_vga_gains_table[idx]) {
+      break;
+    }
+  }
+  if (idx == vga_gains_table_size) {
+    fprintf(stderr, "ERROR - tuner_set_vga_gain(): invalid VGA gain %d\n",
+            gain);
+    return -1;
+  }
+  int ret = tuner_write_value(this, R820T2_VGA_CODE, (uint8_t) idx);
+  if (ret < 0) {
+    log_error("tuner_write_value() failed", __func__, __FILE__, __LINE__);
+    return -1;
+  }
+  return 0;
+}
+
+
+/* IF bandwidth */
+static const struct {
+  uint32_t bandwidth;     /* bandwidth (in Hz) */
+  uint8_t reg0x0a;
+  uint8_t reg0x0b;
+} tuner_if_bandwidth_table[] = {
+  /* settings from Oldenburger; see librtlsdr/src/tuner_r82xx.c line 1722 */
+  { 8000000, 0x10, 0x0b },
+  { 7000000, 0x10, 0x2a },
+  { 6000000, 0x10, 0x6b },
+  { 5000000, 0x0b, 0x6b },
+  { 3000000, 0x04, 0x8f },
+  { 2200000, 0x0f, 0x8f },
+  { 1800000, 0x0f, 0xaf },
+  { 1500000, 0x0e, 0xef },
+  { 1300000, 0x0f, 0xee },
+  { 1200000, 0x0f, 0xed },
+  { 1100000, 0x0f, 0xec },
+  {  900000, 0x0f, 0xeb },
+  {  600000, 0x0f, 0xea },
+  {  450000, 0x0f, 0xe9 },
+  {  300000, 0x0f, 0xe8 }
+};
+
+int tuner_get_if_bandwidths(tuner_t *this __attribute__((unused)),
+                            uint32_t *if_bandwidths[])
+{
+  static uint32_t if_bandwidth_table[sizeof(tuner_if_bandwidth_table) /
+                                     sizeof(tuner_if_bandwidth_table[0])];
+  int if_bandwidth_table_size = sizeof(if_bandwidth_table) /
+                                sizeof(if_bandwidth_table[0]);
+  for (int i = 0; i < if_bandwidth_table_size; ++i) {
+    if_bandwidth_table[i] = tuner_if_bandwidth_table[i].bandwidth;
+  }
+  *if_bandwidths = if_bandwidth_table;
+  return if_bandwidth_table_size;
+}
+
+int tuner_set_if_bandwidth(tuner_t *this, uint32_t bandwidth)
+{
+  int if_bandwidth_table_size = sizeof(tuner_if_bandwidth_table) /
+                                sizeof(tuner_if_bandwidth_table[0]);
+  int idx;
+  for (idx = 0; idx < if_bandwidth_table_size; ++idx) {
+    if (bandwidth == tuner_if_bandwidth_table[idx].bandwidth) {
+      break;
+    }
+  }
+  if (idx == if_bandwidth_table_size) {
+    fprintf(stderr, "ERROR - tuner_set_if_bandwidth(): invalid IF bandwidth %d\n",
+            bandwidth);
+    return -1;
+  }
+
+  tuner_set_value(this, R820T2_FILT_CODE,
+                  tuner_if_bandwidth_table[idx].reg0x0a & 0x0f);
+  tuner_set_value(this, R820T2_FILT_BW,
+                  (tuner_if_bandwidth_table[idx].reg0x0b & 0xe0) >> 5);
+  tuner_set_value(this, R820T2_HPF,
+                  tuner_if_bandwidth_table[idx].reg0x0b & 0x0f);
+  int ret = tuner_write_registers(this, this->registers_dirty_mask);
+  if (ret < 0) {
+    log_error("tuner_write_registers() failed", __func__, __FILE__, __LINE__);
+    return -1;
+  }
+  return 0;
+}
+
+
+/* streaming functions */
+
 int tuner_start(tuner_t *this)
 {
   /* TODO */
@@ -308,6 +507,29 @@ int tuner_stop(tuner_t *this)
 {
   /* TODO */
 printf("this: %p\n", (void *) this);
+  return 0;
+}
+
+
+int tuner_standby(tuner_t *this)
+{
+  const uint8_t standby_registers[][2] = {
+    { 0x06, 0xb1 }, { 0x05, 0xa0 }, { 0x07, 0x3a }, { 0x08, 0x40 },
+    { 0x09, 0xc0 }, { 0x0a, 0x36 }, { 0x0c, 0x35 }, { 0x0f, 0x68 },
+    { 0x11, 0x03 }, { 0x17, 0xf4 }, { 0x19, 0x0c }
+  };
+  int standby_registers_size = sizeof(standby_registers) /
+                               sizeof(standby_registers[0]);
+  for (int i = 0; i < standby_registers_size; ++i) {
+    this->registers[standby_registers[i][0]] = standby_registers[i][1];
+    this->registers_dirty_mask |= 1 << standby_registers[i][0];
+  }
+
+  int ret = tuner_write_registers(this, this->registers_dirty_mask);
+  if (ret < 0) {
+    log_error("tuner_write_registers() failed", __func__, __FILE__, __LINE__);
+    return -1;
+  }
   return 0;
 }
 
