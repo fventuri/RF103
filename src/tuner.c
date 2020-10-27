@@ -63,6 +63,9 @@ struct tuner_pll_parameters;
 struct tuner_mux_parameters;
 
 static int tuner_init_registers(tuner_t *this);
+
+static int tuner_calibrate(tuner_t *this);
+
 static int tuner_set_pll(tuner_t *this, double frequency) __attribute__((unused));
 static int tuner_compute_pll_parameters(tuner_t *this, double frequency,
                                         struct tuner_pll_parameters *pll_params);
@@ -99,6 +102,7 @@ typedef struct tuner {
 
 static const uint32_t DEFAULT_TUNER_XTAL_FREQUENCY = 32000000;
 static const uint32_t DEFAULT_TUNER_IF_FREQUENCY = 7000000;
+static const double CALIBRATION_LO_FREQUENCY = 88e6;
 
 static const uint8_t R820T2_ADDR = 0x1a;
 static const uint8_t R820T2_ADDR_READ  = R820T2_ADDR << 1 | 0x00;
@@ -115,6 +119,7 @@ enum R820T2Registers {
 #pragma GCC diagnostic ignored "-Wunused-const-variable"
 static const uint8_t R820T2_VCO_INDICATOR[] = { 0x02, 0x7f, 0 };
 static const uint8_t R820T2_RF_INDICATOR[]  = { 0x03, 0xff, 0 };
+static const uint8_t R820T2_FIL_CAL_CODE[]  = { 0x04, 0x0f, 0 };
 static const uint8_t R820T2_PWD_LT[]        = { 0x05, 0x80, 7 };
 static const uint8_t R820T2_PWD_LNA1[]      = { 0x05, 0x20, 5 };
 static const uint8_t R820T2_LNA_GAIN_MODE[] = { 0x05, 0x10, 4 };
@@ -137,6 +142,7 @@ static const uint8_t R820T2_PWD_FILT[]      = { 0x0a, 0x80, 7 };
 static const uint8_t R820T2_PW_FILT[]       = { 0x0a, 0x60, 5 };
 static const uint8_t R820T2_FILT_CODE[]     = { 0x0a, 0x0f, 0 };
 static const uint8_t R820T2_FILT_BW[]       = { 0x0b, 0xe0, 5 };
+static const uint8_t R820T2_CAL_TRIGGER[]   = { 0x0b, 0x10, 4 };
 static const uint8_t R820T2_HPF[]           = { 0x0b, 0x0f, 0 };
 static const uint8_t R820T2_PWD_VGA[]       = { 0x0c, 0x40, 6 };
 static const uint8_t R820T2_VGA_MODE[]      = { 0x0c, 0x10, 4 };
@@ -146,6 +152,7 @@ static const uint8_t R820T2_LNA_VTHL[]      = { 0x0d, 0x0f, 0 };
 static const uint8_t R820T2_MIX_VTH_H[]     = { 0x0e, 0xf0, 4 };
 static const uint8_t R820T2_MIX_VTH_L[]     = { 0x0e, 0x0f, 0 };
 static const uint8_t R820T2_CLK_OUT_ENB[]   = { 0x0f, 0x10, 4 };
+static const uint8_t R820T2_CALI_CLK[]      = { 0x0f, 0x04, 2 };
 static const uint8_t R820T2_CLK_AGC_ENB[]   = { 0x0f, 0x02, 1 };
 static const uint8_t R820T2_SEL_DIV[]       = { 0x10, 0xe0, 5 };
 static const uint8_t R820T2_REFDIV[]        = { 0x10, 0x10, 4 };
@@ -206,6 +213,14 @@ tuner_t *tuner_open(usb_device_t *usb_device)
     free(this);
     return ret_val;
   }
+
+  ret = tuner_calibrate(this);
+  if (ret < 0) {
+    log_error("tuner_calibrate() failed", __func__, __FILE__, __LINE__);
+    free(this);
+    return ret_val;
+  }
+
   ret = tuner_read_registers(this, 0xffffffff);
   if (ret < 0) {
     log_error("tuner_read_registers() failed", __func__, __FILE__, __LINE__);
@@ -612,6 +627,77 @@ static int tuner_init_registers(tuner_t *this)
 }
 
 
+/* Kanged from airspy firmware
+ * "inspired by Mauro Carvalho Chehab calibration technique"
+ * https://github.com/airspy/airspyone_firmware/blob/master/common/r820t.c#L626
+ */
+static int tuner_calibrate(tuner_t *this){
+  /* five attempts at calibration */
+  int n_calibration_attempts = 5;
+  for (int i = 0; i < n_calibration_attempts;  ++i) {
+
+    /* set cali clk = on */
+    int ret = tuner_write_value(this, R820T2_CALI_CLK, 1);
+    if (ret < 0) {
+      log_error("tuner_write_value() failed", __func__, __FILE__, __LINE__);
+      return -1;
+    }
+
+    /* xtal cap 0pF for PLL */
+    ret = tuner_write_value(this, R820T2_CAPX, 1);
+    if (ret < 0) {
+      log_error("tuner_write_value() failed", __func__, __FILE__, __LINE__);
+      return -1;
+    }
+
+    /* freq used for calibration */
+    ret = tuner_set_pll(this, CALIBRATION_LO_FREQUENCY);
+    if (ret < 0) {
+      log_error("tuner_set_pll() failed", __func__, __FILE__, __LINE__);
+      return -1;
+    }
+
+    /* start trigger */
+    ret = tuner_write_value(this, R820T2_CAL_TRIGGER, 1);
+    if (ret < 0) {
+      log_error("tuner_write_value() failed", __func__, __FILE__, __LINE__);
+      return -1;
+    }
+
+    usleep(2000);   /* 2ms */
+
+    /* stop trigger */
+    ret = tuner_write_value(this, R820T2_CAL_TRIGGER, 0);
+    if (ret < 0) {
+      log_error("tuner_write_value() failed", __func__, __FILE__, __LINE__);
+      return -1;
+    }
+
+    /* set cali clk = off */
+    ret = tuner_write_value(this, R820T2_CALI_CLK, 0);
+    if (ret < 0) {
+      log_error("tuner_write_value() failed", __func__, __FILE__, __LINE__);
+      return -1;
+    }
+
+    /* check if calibration worked */
+    uint8_t cal_code = 0;
+    ret = tuner_read_value(this, R820T2_FIL_CAL_CODE, &cal_code);
+    if (ret < 0) {
+      log_error("tuner_write_value() failed", __func__, __FILE__, __LINE__);
+      return -1;
+    }
+    if (cal_code && cal_code != 0x0f) {
+      return 0;
+    }
+  }
+
+  fprintf(stderr, "ERROR - unable to calibrate tuner after %d attempts\n",
+          n_calibration_attempts);
+  return -1;
+}
+
+
 struct tuner_pll_parameters {
   uint8_t refdiv;       /* PLL Reference frequency Divider (always 0) */
   uint8_t sel_div;      /* PLL to Mixer divider number control (0-5 for 2-64) */
@@ -753,7 +839,7 @@ static int tuner_apply_pll_parameters(tuner_t *this,
   }
 
   /* is PLL locked? */
-  sleep(1);
+  usleep(1000);
   uint8_t vco_indicator = 0;
   ret = tuner_read_value(this, R820T2_VCO_INDICATOR, &vco_indicator);
   if (ret < 0) {
@@ -768,7 +854,7 @@ static int tuner_apply_pll_parameters(tuner_t *this,
       log_error("tuner_write_value() failed", __func__, __FILE__, __LINE__);
       return -1;
     }
-    sleep(1);
+    sleep(1000);
     uint8_t vco_indicator = 0;
     ret = tuner_read_value(this, R820T2_VCO_INDICATOR, &vco_indicator);
     if (ret < 0) {
