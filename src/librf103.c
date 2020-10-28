@@ -35,7 +35,7 @@ typedef struct rf103 rf103_t;
 
 /* internal functions */
 static uint8_t initial_gpio_register();
-static int vhf_check(rf103_t *this);
+static int is_vhf_mode_on(rf103_t *this);
 
 
 typedef struct rf103 {
@@ -409,86 +409,86 @@ int rf103_read_sync(rf103_t *this, uint8_t *data, int length, int *transferred)
 /* VHF/UHF tuner functions */
 int rf103_set_vhf_frequency(rf103_t *this, double frequency)
 {
-  if (!vhf_check(this)) return -1;
+  if (!is_vhf_mode_on(this)) return -1;
   return tuner_set_frequency(this->tuner, frequency);
 }
 
 int rf103_set_vhf_harmonic_frequency(rf103_t *this, double frequency,
                                      int harmonic)
 {
-  if (!vhf_check(this)) return -1;
+  if (!is_vhf_mode_on(this)) return -1;
   return tuner_set_harmonic_frequency(this->tuner, frequency, harmonic);
 }
 
 int rf103_set_vhf_if_frequency(rf103_t *this, uint32_t if_frequency)
 {
-  if (!vhf_check(this)) return -1;
+  if (!is_vhf_mode_on(this)) return -1;
   return tuner_set_if_frequency(this->tuner, if_frequency);
 }
 
 int rf103_get_vhf_lna_gains(rf103_t *this, const int *gains[])
 {
-  if (!vhf_check(this)) return -1;
+  if (!is_vhf_mode_on(this)) return -1;
   return tuner_get_lna_gains(this->tuner, gains);
 }
 
 int rf103_set_vhf_lna_gain(rf103_t *this, int gain)
 {
-  if (!vhf_check(this)) return -1;
+  if (!is_vhf_mode_on(this)) return -1;
   return tuner_set_lna_gain(this->tuner, gain);
 }
 
 int rf103_set_vhf_lna_agc(rf103_t *this, int agc)
 {
-  if (!vhf_check(this)) return -1;
+  if (!is_vhf_mode_on(this)) return -1;
   return tuner_set_lna_agc(this->tuner, agc);
 }
 
 int rf103_get_vhf_mixer_gains(rf103_t *this, const int *gains[])
 {
-  if (!vhf_check(this)) return -1;
+  if (!is_vhf_mode_on(this)) return -1;
   return tuner_get_mixer_gains(this->tuner, gains);
 }
 
 int rf103_set_vhf_mixer_gain(rf103_t *this, int gain)
 {
-  if (!vhf_check(this)) return -1;
+  if (!is_vhf_mode_on(this)) return -1;
   return tuner_set_mixer_gain(this->tuner, gain);
 }
 
 int rf103_set_vhf_mixer_agc(rf103_t *this, int agc)
 {
-  if (!vhf_check(this)) return -1;
+  if (!is_vhf_mode_on(this)) return -1;
   return tuner_set_mixer_agc(this->tuner, agc);
 }
 
 int rf103_get_vhf_vga_gains(rf103_t *this, const int *gains[])
 {
-  if (!vhf_check(this)) return -1;
+  if (!is_vhf_mode_on(this)) return -1;
   return tuner_get_vga_gains(this->tuner, gains);
 }
 
 int rf103_set_vhf_vga_gain(rf103_t *this, int gain)
 {
-  if (!vhf_check(this)) return -1;
+  if (!is_vhf_mode_on(this)) return -1;
   return tuner_set_vga_gain(this->tuner, gain);
 }
 
 int rf103_get_vhf_if_bandwidths(rf103_t *this, uint32_t *if_bandwidths[])
 {
-  if (!vhf_check(this)) return -1;
+  if (!is_vhf_mode_on(this)) return -1;
   return tuner_get_if_bandwidths(this->tuner, if_bandwidths);
 }
 
 int rf103_set_vhf_if_bandwidth(rf103_t *this, uint32_t bandwidth)
 {
-  if (!vhf_check(this)) return -1;
+  if (!is_vhf_mode_on(this)) return -1;
   return tuner_set_if_bandwidth(this->tuner, bandwidth);
 }
 
 
 /* auxiliary function */
-static int vhf_check(rf103_t *this)
+static int is_vhf_mode_on(rf103_t *this)
 {
   if (!(this->rf_mode == VHF_MODE && this->tuner)) {
     fprintf(stderr, "ERROR - device is not in VHF mode (or no tuner)\n");
