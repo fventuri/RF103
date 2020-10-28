@@ -228,7 +228,6 @@ tuner_t *tuner_open(usb_device_t *usb_device)
     return ret_val;
   }
 
-
   ret_val = this;
   return ret_val;
 }
@@ -508,20 +507,17 @@ int tuner_set_if_bandwidth(tuner_t *this, uint32_t bandwidth)
 }
 
 
-/* streaming functions */
-
-int tuner_start(tuner_t *this)
+/* straming functions */
+int tuner_start(tuner_t *this __attribute__((unused)))
 {
-  /* TODO */
-printf("this: %p\n", (void *) this);
+  /* not much to do here for now */
   return 0;
 }
 
 
-int tuner_stop(tuner_t *this)
+int tuner_stop(tuner_t *this __attribute__((unused)))
 {
-  /* TODO */
-printf("this: %p\n", (void *) this);
+  /* not much to do here for now */
   return 0;
 }
 

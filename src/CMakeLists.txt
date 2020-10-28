@@ -28,6 +28,8 @@ add_executable(rf103_test rf103_test.c)
 target_link_libraries(rf103_test rf103)
 add_executable(rf103_stream_test rf103_stream_test.c wavewrite.c)
 target_link_libraries(rf103_stream_test rf103)
+add_executable(rf103_vhf_stream_test rf103_vhf_stream_test.c wavewrite.c)
+target_link_libraries(rf103_vhf_stream_test rf103)
 
 
 # install
@@ -35,6 +37,6 @@ install(TARGETS rf103
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
-install(TARGETS rf103_test rf103_stream_test
+install(TARGETS rf103_test rf103_stream_test rf103_vhf_stream_test
   DESTINATION ${CMAKE_INSTALL_BINDIR}
 )

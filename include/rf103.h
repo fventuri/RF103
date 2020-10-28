@@ -108,6 +108,34 @@ int rf103_reset_status(rf103_t *this);
 
 int rf103_read_sync(rf103_t *this, uint8_t *data, int length, int *transferred);
 
+/* VHF/UHF tuner functions */
+int rf103_set_vhf_frequency(rf103_t *this, double frequency);
+
+int rf103_set_vhf_harmonic_frequency(rf103_t *this, double frequency,
+                                     int harmonic);
+
+int rf103_set_vhf_if_frequency(rf103_t *this, uint32_t if_frequency);
+
+int rf103_get_vhf_lna_gains(rf103_t *this, const int *gains[]);
+
+int rf103_set_vhf_lna_gain(rf103_t *this, int gain);
+
+int rf103_set_vhf_lna_agc(rf103_t *this, int agc);
+
+int rf103_get_vhf_mixer_gains(rf103_t *this, const int *gains[]);
+
+int rf103_set_vhf_mixer_gain(rf103_t *this, int gain);
+
+int rf103_set_vhf_mixer_agc(rf103_t *this, int agc);
+
+int rf103_get_vhf_vga_gains(rf103_t *this, const int *gains[]);
+
+int rf103_set_vhf_vga_gain(rf103_t *this, int gain);
+
+int rf103_get_vhf_if_bandwidths(rf103_t *this, uint32_t *if_bandwidths[]);
+
+int rf103_set_vhf_if_bandwidth(rf103_t *this, uint32_t bandwidth);
+
 #ifdef __cplusplus
 }
 #endif
