@@ -142,6 +142,7 @@ static const uint8_t R820T2_PWD_FILT[]      = { 0x0a, 0x80, 7 };
 static const uint8_t R820T2_PW_FILT[]       = { 0x0a, 0x60, 5 };
 static const uint8_t R820T2_FILT_CODE[]     = { 0x0a, 0x0f, 0 };
 static const uint8_t R820T2_FILT_BW[]       = { 0x0b, 0xe0, 5 };
+static const uint8_t R820T2_FILT_CAP[]      = { 0x0b, 0x60, 5 }; /* ??? */
 static const uint8_t R820T2_CAL_TRIGGER[]   = { 0x0b, 0x10, 4 };
 static const uint8_t R820T2_HPF[]           = { 0x0b, 0x0f, 0 };
 static const uint8_t R820T2_PWD_VGA[]       = { 0x0c, 0x40, 6 };
@@ -625,15 +626,24 @@ static int tuner_init_registers(tuner_t *this)
 
 /* Kanged from airspy firmware
  * "inspired by Mauro Carvalho Chehab calibration technique"
- * https://github.com/airspy/airspyone_firmware/blob/master/common/r820t.c#L626
+ * https://github.com/torvalds/linux/blob/master/drivers/media/tuners/r820t.c#L1077
+ * https://cgit.osmocom.org/rtl-sdr/tree/src/tuner_r82xx.c
  */
 static int tuner_calibrate(tuner_t *this){
   /* five attempts at calibration */
   int n_calibration_attempts = 5;
   for (int i = 0; i < n_calibration_attempts;  ++i) {
 
+    /* set filt cap */
+    /* fv - not so sure about this FILT_CAP thing, since it is not the R820T registers */
+    int ret = tuner_write_value(this, R820T2_FILT_CAP, 0);
+    if (ret < 0) {
+      log_error("tuner_write_value() failed", __func__, __FILE__, __LINE__);
+      return -1;
+    }
+
     /* set cali clk = on */
-    int ret = tuner_write_value(this, R820T2_CALI_CLK, 1);
+    ret = tuner_write_value(this, R820T2_CALI_CLK, 1);
     if (ret < 0) {
       log_error("tuner_write_value() failed", __func__, __FILE__, __LINE__);
       return -1;
