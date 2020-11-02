@@ -690,7 +690,7 @@ static int tuner_calibrate(tuner_t *this){
     uint8_t cal_code = 0;
     ret = tuner_read_value(this, R820T2_FIL_CAL_CODE, &cal_code);
     if (ret < 0) {
-      log_error("tuner_write_value() failed", __func__, __FILE__, __LINE__);
+      log_error("tuner_read_value() failed", __func__, __FILE__, __LINE__);
       return -1;
     }
     if (cal_code && cal_code != 0x0f) {
