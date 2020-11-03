@@ -345,6 +345,13 @@ int rf103_start_streaming(rf103_t *this)
       fprintf(stderr, "ERROR - tuner_start() failed\n");
       return -1;
     }
+    // switch to VHF input
+    ret = usb_device_gpio_set(this->usb_device, 0,
+                               GPIO_SEL0 | GPIO_SEL1);
+    if (ret < 0) {
+      fprintf(stderr, "ERROR - input selection failed\n");
+      return -1;
+    }
   }
   adc_set_sample_rate(this->adc, (uint32_t) this->sample_rate);
   ret = adc_start(this->adc);
