@@ -377,6 +377,10 @@ int usb_device_control(usb_device_t *this, uint8_t request, uint16_t value,
       break;
     case GPIOFX3:
     case I2CWFX3:
+// fv
+fprintf(stderr, "DEBUG - I2CWFX3 - bmWriteRequestType=0x%02x request=0x%02x value=0x%04x index=0x%04x length=0x%04x data=0x%02x", bmWriteRequestType, request, value, index, length, data[0]);
+for (int xyz = 1; xyz < length; xyz++) fprintf(stderr, " 0x%02x", data[xyz]);
+fprintf(stderr, "\n");
       ret = libusb_control_transfer(this->dev_handle, bmWriteRequestType,
                                     request, value, index, data, length,
                                     timeout);
@@ -387,6 +391,8 @@ int usb_device_control(usb_device_t *this, uint8_t request, uint16_t value,
       break;
     case TESTFX3:
     case I2CRFX3:
+// fv
+fprintf(stderr, "DEBUG - I2CRFX3 - bmReadRequestType=0x%02x request=0x%02x value=0x%04x index=0x%04x length=0x%04x\n", bmReadRequestType, request, value, index, length);
       ret = libusb_control_transfer(this->dev_handle, bmReadRequestType,
                                     request, value, index, data, length,
                                     timeout);
