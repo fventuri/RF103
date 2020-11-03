@@ -291,7 +291,7 @@ int tuner_set_harmonic_frequency(tuner_t *this, double frequency,
                                  int harmonic)
 {
   if (harmonic < 0 || harmonic % 2 == 0) {
-    fprintf(stderr, "ERROR - tuner_set_harmonic_frequency() failed: invalid hardmonic %d\n", harmonic);
+    fprintf(stderr, "ERROR - tuner_set_harmonic_frequency() failed: invalid harmonic %d\n", harmonic);
     return -1;
   }
 
