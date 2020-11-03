@@ -860,7 +860,7 @@ static int tuner_apply_pll_parameters(tuner_t *this,
       log_error("tuner_write_value() failed", __func__, __FILE__, __LINE__);
       return -1;
     }
-    sleep(1000);
+    usleep(1000);
     uint8_t vco_indicator = 0;
     ret = tuner_read_value(this, R820T2_VCO_INDICATOR, &vco_indicator);
     if (ret < 0) {
