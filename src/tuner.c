@@ -105,8 +105,8 @@ static const uint32_t DEFAULT_TUNER_IF_FREQUENCY = 7000000;
 static const double CALIBRATION_LO_FREQUENCY = 88e6;
 
 static const uint8_t R820T2_ADDR = 0x1a;
-static const uint8_t R820T2_ADDR_READ  = R820T2_ADDR << 1 | 0x00;
-static const uint8_t R820T2_ADDR_WRITE = R820T2_ADDR << 1 | 0x01;
+static const uint8_t R820T2_ADDR_READ  = R820T2_ADDR << 1;
+static const uint8_t R820T2_ADDR_WRITE = R820T2_ADDR << 1;
 static const uint32_t R820T2_REGISTERS_READ_MASK  = 0xffffffff;
 static const uint32_t R820T2_REGISTERS_WRITE_MASK = 0xfffffff0;
 
@@ -291,7 +291,7 @@ int tuner_set_harmonic_frequency(tuner_t *this, double frequency,
                                  int harmonic)
 {
   if (harmonic < 0 || harmonic % 2 == 0) {
-    fprintf(stderr, "ERROR - tuner_set_harmonic_frequency() failed: invalid hardmonic %d\n", harmonic);
+    fprintf(stderr, "ERROR - tuner_set_harmonic_frequency() failed: invalid harmonic %d\n", harmonic);
     return -1;
   }
 
@@ -860,7 +860,7 @@ static int tuner_apply_pll_parameters(tuner_t *this,
       log_error("tuner_write_value() failed", __func__, __FILE__, __LINE__);
       return -1;
     }
-    sleep(1000);
+    usleep(1000);
     uint8_t vco_indicator = 0;
     ret = tuner_read_value(this, R820T2_VCO_INDICATOR, &vco_indicator);
     if (ret < 0) {
@@ -869,8 +869,8 @@ static int tuner_apply_pll_parameters(tuner_t *this,
     }
   }
   if (!(vco_indicator & 0x40)) {
-    fprintf(stderr, "ERROR - unable to get the PLL to lock\n");
-    return -1;
+    fprintf(stderr, "WARNING - unable to get the PLL to lock\n");
+    //return -1;
   }
 
   /* set PLL autotune = 8kHz */
@@ -996,18 +996,27 @@ static int tuner_apply_mux_parameters(tuner_t *this,
   return 0;
 }
 
+static uint8_t r82xx_bitrev(uint8_t byte)
+{
+	const uint8_t lut[16] = { 0x0, 0x8, 0x4, 0xc, 0x2, 0xa, 0x6, 0xe,
+				  0x1, 0x9, 0x5, 0xd, 0x3, 0xb, 0x7, 0xf };
+
+	return (lut[byte & 0xf] << 4) | lut[byte >> 4];
+}
+
 
 static int tuner_read_value(tuner_t *this, const uint8_t where[3],
                             uint8_t *value) {
   uint8_t reg = where[0];
+  /* as suggested by Hayati, we always need to read registers from 0 to reg */
   int ret = usb_device_i2c_read(this->usb_device, R820T2_ADDR_READ,
-                                reg, this->registers + reg, 1);
+                                0, this->registers, reg + 1);
   if (ret < 0) {
     log_error("usb_device_i2c_read() failed", __func__, __FILE__, __LINE__);
     return -1;
   }
-  this->registers_dirty_mask &= ~(1 << reg);
-  *value = (this->registers[reg] & where[1]) >> where[2];
+  this->registers_dirty_mask &= ~((1 << (reg + 1)) - 1);
+  *value = (r82xx_bitrev(this->registers[reg]) & where[1]) >> where[2];
   return 0;
 }
 
