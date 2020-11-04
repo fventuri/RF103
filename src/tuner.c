@@ -1015,8 +1015,12 @@ static int tuner_read_value(tuner_t *this, const uint8_t where[3],
     log_error("usb_device_i2c_read() failed", __func__, __FILE__, __LINE__);
     return -1;
   }
+  /* reverse bit order when reading */
+  for (int i = 0; i < reg + 1; i++) {
+    this->registers[i] = r82xx_bitrev(this->registers[i]);
+  }
   this->registers_dirty_mask &= ~((1 << (reg + 1)) - 1);
-  *value = (r82xx_bitrev(this->registers[reg]) & where[1]) >> where[2];
+  *value = (this->registers[reg] & where[1]) >> where[2];
   return 0;
 }
 
@@ -1034,6 +1038,10 @@ static int tuner_read_registers(tuner_t *this, uint32_t register_mask)
         if (ret < 0) {
           log_error("usb_device_i2c_read() failed", __func__, __FILE__, __LINE__);
           return -1;
+        }
+        /* reverse bit order when reading */
+        for (int j = from; j < i; j++) {
+          this->registers[j] = r82xx_bitrev(this->registers[j]);
         }
         from = -1;
       }
