@@ -52,6 +52,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include <assert.h>
+
 #include "tuner.h"
 #include "logging.h"
 
@@ -1068,6 +1070,13 @@ static int tuner_read_registers(tuner_t *this, uint32_t register_mask)
 
 static int tuner_write_value(tuner_t *this, const uint8_t where[3],
                              uint8_t value) {
+
+  /* assertions suggested by Hayati */
+  /* value should be zero outside of mask */
+  assert( ( ((uint16_t)value << where[2]) & ~((uint16_t)where[1]) ) == 0 );
+  // mask should be >= lowest bit's value */
+  assert( where[1] >= (1U << where[2]) );
+
   uint8_t reg = where[0];
   this->registers[reg] &= ~where[1];
   this->registers[reg] |= value << where[2];
