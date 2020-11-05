@@ -957,7 +957,7 @@ static int tuner_compute_mux_parameters(tuner_t *this __attribute__((unused)),
 
   memset(mux_params, 0, sizeof(*mux_params));
 
-  int mux_params_table_size = sizeof(mux_params_table) / sizeof(mux_params_table);
+  int mux_params_table_size = sizeof(mux_params_table) / sizeof(mux_params_table[0]);
   int idx;
   for (idx = 0; idx < mux_params_table_size - 1; ++idx) {
     if (frequency < mux_params_table[idx+1].lower_frequency) {
