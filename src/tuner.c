@@ -886,8 +886,10 @@ static int tuner_apply_pll_parameters(tuner_t *this,
 
 struct tuner_mux_parameters {
   uint8_t open_d;       /* Open Drain */
-  uint8_t rf_mux_ploy;  /* RF_MUX, Polymux */
-  uint8_t tf_c;         /* Tracking Filter Band */
+  uint8_t rfmux;        /* RF_MUX, Polymux */
+  uint8_t rffilt;       /* RF_MUX, Polymux */
+  uint8_t tf_nch;       /* Tracking Filter Band */
+  uint8_t tf_lp;        /* Tracking Filter Band */
 };
 
 
@@ -919,7 +921,11 @@ static int tuner_compute_mux_parameters(tuner_t *this __attribute__((unused)),
    */
   const struct {
     double lower_frequency;
-    struct tuner_mux_parameters mux_parameters;
+    struct {
+      uint8_t open_d;       /* Open Drain */
+      uint8_t rf_mux_ploy;  /* RF_MUX, Polymux */
+      uint8_t tf_c;         /* Tracking Filter Band */
+    } mux_parameters;
   } mux_params_table[] = {
   /*
    * freq                            open_d  rf_mux_ploy     tf_c
@@ -956,9 +962,13 @@ static int tuner_compute_mux_parameters(tuner_t *this __attribute__((unused)),
       break;
     }
   }
-  mux_params->open_d = mux_params_table[idx].mux_parameters.open_d;
-  mux_params->rf_mux_ploy = mux_params_table[idx].mux_parameters.rf_mux_ploy;
-  mux_params->tf_c = mux_params_table[idx].mux_parameters.tf_c;
+  mux_params->open_d = mux_params_table[idx].mux_parameters.open_d >> 3;
+  uint8_t rf_mux_ploy = mux_params_table[idx].mux_parameters.rf_mux_ploy;
+  mux_params->rfmux = (rf_mux_ploy & 0xc0) >> 6;
+  mux_params->rffilt = rf_mux_ploy & 0x03;
+  uint8_t tf_c = mux_params_table[idx].mux_parameters.tf_c;
+  mux_params->tf_nch = (tf_c & 0xf0) >> 4;
+  mux_params->tf_lp = tf_c & 0x0f;
 
   /* all good */
   return 0;
@@ -969,11 +979,11 @@ static int tuner_apply_mux_parameters(tuner_t *this,
                                       const struct tuner_mux_parameters *mux_params)
 {
   /* set MUX parameters */
-  tuner_set_value(this, R820T2_OPEN_D, mux_params->open_d >> 3);
-  tuner_set_value(this, R820T2_RFMUX, (mux_params->rf_mux_ploy & 0xc0) >> 6);
-  tuner_set_value(this, R820T2_RFFILT, (mux_params->rf_mux_ploy & 0x03) >> 0);
-  tuner_set_value(this, R820T2_TF_NCH, (mux_params->tf_c & 0xf0) >> 4);
-  tuner_set_value(this, R820T2_TF_LP, (mux_params->tf_c & 0x0f) >> 0);
+  tuner_set_value(this, R820T2_OPEN_D, mux_params->open_d);
+  tuner_set_value(this, R820T2_RFMUX, mux_params->rfmux);
+  tuner_set_value(this, R820T2_RFFILT, mux_params->rffilt);
+  tuner_set_value(this, R820T2_TF_NCH, mux_params->tf_nch);
+  tuner_set_value(this, R820T2_TF_LP, mux_params->tf_lp);
 
   /* XTAL CAP & Drive */
   /* Internal xtal no cap,  bit3 = 0 ? */
